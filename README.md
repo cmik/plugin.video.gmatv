@@ -1,4 +1,4 @@
-[![Kodi version](https://img.shields.io/badge/kodi%20versions-16+-blue)](https://kodi.tv/)
+[![Kodi version](https://img.shields.io/badge/kodi%20versions-19+-blue)](https://kodi.tv/)
 [![GitHub release](https://img.shields.io/github/v/release/cmik/plugin.video.gmatv.svg)](https://github.com/cmik/plugin.video.gmatv/releases)
 
 ## GMA.tv add-on
