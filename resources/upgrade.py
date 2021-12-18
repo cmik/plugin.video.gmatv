@@ -33,3 +33,5 @@ def upgradeDB():
             updateQueries.append('UPDATE SHOW SET VIEWS = %d WHERE ID = %d' % (int(data[1]), int(data[0])))
         showDB.executeUpdate(logger.logInfo(updateQueries))
         
+def upgradeSettings():
+    return True

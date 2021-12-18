@@ -5,18 +5,18 @@
     Copyright (C) 2020 cmik
 '''
 
-import os,sys,re,urllib,urllib2,ssl,cookielib,json,datetime,time,hashlib
+import os,sys,re,ssl,json,datetime,time,hashlib
+import http.cookiejar as cookielib
 import inputstreamhelper
+from unidecode import unidecode
+from urllib import request as libRequest
+from urllib.parse import urlencode,quote,quote_plus
 from operator import itemgetter
 from resources import config
-from resources.lib.libraries import control
-from resources.lib.libraries import cache
-from resources.lib.models import episodes
-from resources.lib.models import shows
-from resources.lib.models import library
-from resources.lib.models import showcast
+from resources.lib.libraries import control,cache
+from resources.lib.models import episodes,shows,library,showcast
 
-common = control.common
+bs = control.soup
 logger = control.logger
 
 # Load DB
@@ -30,14 +30,15 @@ Logged = False
 #---------------------- FUNCTIONS ----------------------------------------                  
 def playEpisode(id, name, thumbnail, bandwidth=False):
     logger.logInfo('called function with param (%s)' % id)
-    # control.showNotification(control.lang(50005), control.lang(50008))
+    # control.showNotification(control.lang(30005), control.lang(30008))
     # control.execute('RunPlugin(plugin://plugin.video.youtube/play/?video_id=%s)' % id)
     episodeDetails = getMediaInfo(id, name, thumbnail, bandwidth)
     logger.logDebug(episodeDetails)
     if episodeDetails and 'errorCode' in episodeDetails and episodeDetails['errorCode'] == 0 and 'data' in episodeDetails:
         episode = episodeDetails.get('data')
         logger.logInfo(episode.get('plot'))
-        liz = control.item(name, path='plugin://plugin.video.youtube/play/?video_id=%s' % episode.get('videoID'), thumbnailImage=episode.get('image'), iconImage="DefaultVideo.png")
+        liz = control.item(name, path='plugin://plugin.video.youtube/play/?video_id=%s' % episode.get('videoID'))
+        liz.setArt({'thumb':episode.get('image'), 'icon':"DefaultVideo.png"})
         liz.setInfo(type='video', infoLabels={
             'title': name, 
             'sorttitle' : episode.get('dateaired'),
@@ -56,7 +57,7 @@ def playEpisode(id, name, thumbnail, bandwidth=False):
         try: 
             return control.resolve(thisPlugin, True, liz)
         except: 
-            control.showNotification(control.lang(57032), control.lang(50004))
+            control.showNotification(control.lang(37032), control.lang(30004))
     return False
     
 def getMediaInfo(episodeId, title, thumbnail, bandwidth=False):
@@ -105,22 +106,22 @@ def resetCatalogCache():
     logger.logInfo('called function')
     episodeDB.drop()
     showDB.drop()
-    control.showNotification(control.lang(57039), control.lang(50010))
+    control.showNotification(control.lang(37039), control.lang(30010))
     reloadCatalogCache()
 
 def reloadCatalogCache():
     logger.logInfo('called function')
     updateEpisodes = False
-    if (control.confirm(control.lang(57035), line1=control.lang(57036), title=control.lang(50402))):
+    if control.confirm('%s\n%s' % (control.lang(37035), control.lang(37036)), title=control.lang(30402)) == True:
         updateEpisodes = True
     if updateCatalogCache(updateEpisodes) is True:
-        control.showNotification(control.lang(57003), control.lang(50010))
+        control.showNotification(control.lang(37003), control.lang(30010))
     else:
-        control.showNotification(control.lang(57027), control.lang(50004))
+        control.showNotification(control.lang(37027), control.lang(30004))
     
 def updateCatalogCache(loadEpisodes=False):
     logger.logInfo('called function')
-    control.showNotification(control.lang(57015), control.lang(50005))
+    control.showNotification(control.lang(37015), control.lang(30005))
     cache.longCache.cacheClean(True) 
     cache.shortCache.cacheClean(True)
     
@@ -130,13 +131,13 @@ def updateCatalogCache(loadEpisodes=False):
     try:
         # update sections cache
         # if control.setting('displayWebsiteSections') == 'true':
-            # control.showNotification(control.lang(57013))
+            # control.showNotification(control.lang(37013))
             # sections = cache.sCacheFunction(getWebsiteHomeSections)
             # for section in sections:
                 # cache.sCacheFunction(getWebsiteSectionContent, section['id'])
         
         # update sections cache
-        control.showNotification(control.lang(57014), control.lang(50005))
+        control.showNotification(control.lang(37014), control.lang(30005))
         sections = getWebsiteHomeSections()
         nbCat = len(sections)
         i = 0
@@ -172,7 +173,7 @@ def updateCatalogCache(loadEpisodes=False):
                 percent = catpercent + (cat1percent * (showpercent / 100) / 100)
                 logger.logNotice('Updating catalog... %s' % (str(percent)+'%'))
                 logger.logNotice(str(percent)+'%')
-                control.infoDialog('Updating catalog... %s' % (str(percent)+'%'), heading=control.lang(50005), icon=control.addonIcon(), time=10000)
+                control.infoDialog('Updating catalog... %s' % (str(percent)+'%'), heading=control.lang(30005), icon=control.addonIcon(), time=10000)
         i+=1
         
     return True
@@ -181,33 +182,30 @@ def getSiteMenu():
     logger.logInfo('called function')
     data = []
     
-    html = callServiceApi(config.uri.get('base'), base_url = config.websiteUrl)
-    menu = common.parseDOM(html, "div", attrs = { 'id' : 'main_nav_desk' })[0]
-    categories = common.parseDOM(menu, "li", attrs = { 'class' : 'has_children' })
+    html = bs(callServiceApi(config.uri.get('base'), base_url = config.websiteUrl), 'html.parser')
+    menu = html.find("div", attrs = { 'id' : 'main_nav_desk' }).get_text()
     
-    for category in categories:
+    for category in html.find_all("li", attrs = { 'class' : 'has_children' }):
         
         subCategories = []
-        name = common.parseDOM(category, "a")[0]
-        id = common.parseDOM(category, "a", ret = 'data-id')[0]
-        url = common.parseDOM(category, "a", ret = 'href')[0]
-        menuitem = common.parseDOM(category, "ul", attrs = { 'class' : 'menu_item' })[0]
-        subcatlist = common.parseDOM(menuitem, "li")
+        name = category.a.get_text()
+        id = category.a['data-id']
+        url = category.a['href']
         
-        for subcat in subcatlist:
-            subcatname = common.parseDOM(subcat, "a")[0]
-            subcaturl = common.parseDOM(subcat, "a", ret = 'href')[0]
+        for subcat in category.find("ul", attrs = { 'class' : 'menu_item' }).li:
+            subcatname = subcat.a.get_text()
+            subcaturl = subcat.a['href']
             id = re.compile('/([0-9]+)/', re.IGNORECASE).search(subcaturl).group(1)
         
             subCategories.append({
                 'id' : str(id), 
-                'name' : common.replaceHTMLCodes(subcatname), 
+                'name' : subcatname, 
                 'url' : subcaturl
                 })
         
         data.append({
             'id' : str(id), 
-            'name' : common.replaceHTMLCodes(name), 
+            'name' : name, 
             'url' : url, 
             'subcat' : subCategories
             })
@@ -248,15 +246,12 @@ def getMylistShowLastEpisodes():
     logger.logInfo(key)
     if cache.shortCache.get(key) == '':
         url = config.uri.get('myList')
-        html = callServiceApi(url, useCache=False)
+        html = bs(callServiceApi(url, useCache=False), 'html.parser')
 
-        section = common.parseDOM(html, "section", attrs = { 'id' : 'mylist-shows' })
-        content = common.parseDOM(section, "ul", attrs = { 'class' : 'og-grid tv-programs-grid' })
-        if len(content) > 0:
-            items = common.parseDOM(content, "li")
-            
-            for item in items:
-                url = common.parseDOM(item, "a", ret = 'href')[0]
+        content = html.find("section", attrs = { 'id' : 'mylist-shows' }).find("ul", attrs = { 'class' : 'og-grid tv-programs-grid' })
+        if content:
+            for item in content.find_all("li"):
+                url = item.a['href']
                 if '/show/' in url:
                     show = extractMyListShowData(url, item)
                     (episodes, n) = getEpisodesPerPage(show.get('id'), show.get('parentid'), show.get('year', ''), 1, 1)
@@ -272,13 +267,11 @@ def extractListCategoryItems(html, id):
     logger.logInfo('called function')
     data = []
     
-    section = common.parseDOM(html, "section", attrs = { 'id' : id })
-    content = common.parseDOM(section, "ul", attrs = { 'class' : 'og-grid tv-programs-grid' })
-    if len(content) > 0:
-        items = common.parseDOM(content, "li")
-        
-        for item in items:
-            url = common.parseDOM(item, "a", ret = 'href')[0]
+    html = bs(html, 'html.parser')
+    content = html.find("section", attrs = { 'id' : id }).find("ul", attrs = { 'class' : 'og-grid tv-programs-grid' })
+    if content:
+        for item in content.find_all("li"):
+            url = item.a['href']
             if '/show/' in url:
                 data.append(extractMyListShowData(url, item))
             elif '/episode/' in url:
@@ -293,8 +286,8 @@ def extractMyListShowData(url, html):
     if len(res) == 1:
         return res[0]
     else:
-        showName = common.replaceHTMLCodes(common.parseDOM(html, "div", attrs = { 'class' : 'show-cover-thumb-title-mobile sub-category' })[0])
-        image = common.parseDOM(html, "img", ret = 'src')[0]
+        showName = html.find("div", attrs = { 'class' : 'show-cover-thumb-title-mobile sub-category' }).get_text()
+        image = html.img['src']
         
         return {
             'type' : 'show',
@@ -302,7 +295,7 @@ def extractMyListShowData(url, html):
             'id' : int(showId),
             'parentid' : -1,
             'parentname' : '',
-            'name' : common.replaceHTMLCodes(showName),
+            'name' : showName,
             'logo' : image,
             'image' : image,
             'fanart' : image,
@@ -320,9 +313,9 @@ def extracMyListEpisodeData(url, html):
     if len(res) == 1:
         return res[0]
     else:
-        showName = common.replaceHTMLCodes(common.parseDOM(html, "h2", attrs = { 'class' : 'show-cover-thumb-title-mobile sub-category' })[0])
-        image = common.parseDOM(html, "img", ret = 'src')[0]
-        dateAired = common.parseDOM(html, "h3", attrs = { 'class' : 'show-cover-thumb-title-mobile sub-category' })
+        showName = html.find("h2", attrs = { 'class' : 'show-cover-thumb-title-mobile sub-category' }).get_text()
+        image = html.img['src']
+        dateAired = html.find("h3", attrs = { 'class' : 'show-cover-thumb-title-mobile sub-category' }).get_text()
         
         year = ''
         episodeNumber = 0
@@ -342,7 +335,7 @@ def extracMyListEpisodeData(url, html):
             'id' : int(episodeId), 
             'parentid' : -1,
             'parentname' : '',
-            'title' : common.replaceHTMLCodes('%s - %s' % (showName, episodeName)), 
+            'title' : '%s - %s' % (showName, episodeName), 
             'show' : showName, 
             'image' : image, 
             'episodenumber' : episodeNumber,
@@ -360,13 +353,13 @@ def extracMyListEpisodeData(url, html):
 def extractListCategories(html):
     logger.logInfo('called function')
     data = []
-    
-    nav = common.parseDOM(common.parseDOM(html, "nav"), "li")
-    for li in nav:
-        name, count = common.stripTags(common.parseDOM(li, "a")[0]).split(' ', 1)
+    html = bs(html, 'html.parser')
+
+    for li in html.nav.find_all("li"):
+        name, count = li.a.get_text().split(' ', 1)
         data.append({
-            'id' : common.parseDOM(li, "a", ret = 'href')[0].replace('#', ''),
-            'name' : '%s (%s)' % (name.title(), count)
+            'id' : li.a['href'].replace('#', ''),
+            'name' : '%s (%s)' % (name, count)
             })
     # listCat = common.parseDOM(html, "section", attrs = { 'class' : 'sub-category-page' }, ret = 'id')
     # int(re.compile('/([0-9]+)/', re.IGNORECASE).search(url).group(1))
@@ -436,9 +429,9 @@ def extractWebsiteSectionShowData(show):
     logger.logInfo('called function')
     
     showId = show.get('id', '')
-    showName = show.get('show_title', '')
+    showName = unicodetoascii(show.get('show_title', ''))
     image = generateImageURL(show.get('primary_poster')[0].get('image_name'))
-    description = common.replaceHTMLCodes(show.get('synopsis', ''))
+    description = unicodetoascii(show.get('synopsis', ''))
     year = show.get('airing_year', '')
     if year == '':
         try:
@@ -458,7 +451,7 @@ def extractWebsiteSectionShowData(show):
             'id' : int(showId),
             'parentid' : -1,
             'parentname' : genre,
-            'name' : common.replaceHTMLCodes(showName),
+            'name' : showName,
             'logo' : image,
             'image' : image,
             'fanart' : image,
@@ -481,64 +474,18 @@ def generateImageURL(image, type='poster', res='high'):
         img = 'episode'
     return config.websiteCDNUrl + config.uri.get(img) % image
 
-def extractWebsiteSectionEpisodeData(url, html):
-    logger.logInfo('called function with param (%s, %s)' % (url, html))
-    episodeId = re.compile('/([0-9]+)/', re.IGNORECASE).search(url).group(1)
-    res = episodeDB.get(episodeId)
-    if len(res) == 1:
-        return res[0]
-    else:
-        showName = common.replaceHTMLCodes(common.parseDOM(html, "h3", attrs = { 'class' : 'show-cover-thumb-title-mobile' })[0])
-        try:image = common.parseDOM(html, "div", attrs = { 'class' : 'show-cover' }, ret = 'data-src')[0]
-        except:image = common.parseDOM(html, "div", attrs = { 'class' : 'show-cover lazy' }, ret = 'data-src')[0]
-        dateAired = common.parseDOM(html, "h4", attrs = { 'class' : 'show-cover-thumb-aired-mobile' })
-        
-        year = ''
-        episodeNumber = 0
-        description = ''
-        episodeName = ''
-        
-        if dateAired and len(dateAired) > 0:
-            episodeName = dateAired[0]
-            year = episodeName.split(', ')[1]
-
-        try:
-            datePublished = datetime.datetime.strptime(episodeName, '%b %d, %Y')
-        except TypeError:
-            datePublished = datetime.datetime(*(time.strptime(episodeName, '%b %d, %Y')[0:6]))
-            
-        return {
-            'id' : int(episodeId), 
-            'parentid' : -1,
-            'parentname' : '',
-            'title' : common.replaceHTMLCodes('%s - %s' % (showName, episodeName)), 
-            'show' : showName, 
-            'image' : image, 
-            'episodenumber' : episodeNumber,
-            'url' : url, 
-            'description' : '',
-            'shortdescription' : '',
-            'dateaired' : episodeName,
-            'date' : datePublished.strftime('%Y-%m-%d'),
-            'year' : year,
-            'fanart' : image,
-            'ltype' : 'episode',
-            'type' : 'episode'
-            }
-
 def getShows(subCategoryId, page = 1):
     logger.logInfo('called function with param (%s, %s)' % (subCategoryId, page))
     data = []
     subCategoryShows = []    
     
-    html = callServiceApi(config.uri.get('categoryList') % subCategoryId)
+    html = bs(callServiceApi(config.uri.get('categoryList') % subCategoryId), 'html.parser')
     subCategoryShows.append(extractShows(html))
     
-    pagination = common.parseDOM(html, 'ul', attrs = { 'id' : 'pagination' })    
-    pages = common.parseDOM(pagination, 'a', ret = 'href')
+    pages = html.find('ul', attrs = { 'id' : 'pagination' }).find_all('a')
     if len(pages) > 1:
         for url in pages[1:]:
-            subCategoryShows.append(extractShows(callServiceApi(url)))
+            subCategoryShows.append(extractShows(callServiceApi(url['href'])))
     
     if len(subCategoryShows) > 0:
         for sub in subCategoryShows:
@@ -576,15 +523,15 @@ def getShows(subCategoryId, page = 1):
 def extractShows(html):
     logger.logInfo('called function')
     data = []
-    list = common.parseDOM(html, "ul", attrs = { 'id' : 'og-grid' })[0]
-    shows = common.parseDOM(list, "li", attrs = { 'class' : 'og-grid-item-o' })
-    dateaired = common.parseDOM(list, "li", attrs = { 'class' : 'og-grid-item-o' }, ret = 'data-aired')
+    list = html.find("ul", attrs = { 'id' : 'og-grid' })
+    shows = list.find_all("li", attrs = { 'class' : 'og-grid-item-o' })
+    dateaired = list.find("li", attrs = { 'class' : 'og-grid-item-o' })['data-aired']
     i = 0
     for show in shows:
-        name = common.parseDOM(show, "h2")[0]
-        aired = common.parseDOM(show, "h3")[0]
-        image = common.parseDOM(show, "img", ret = 'src')[0]
-        url = common.parseDOM(show, "a", ret = 'href')[0]
+        name = unicodetoascii(show.h2.get_text())
+        aired = unicodetoascii(show.h3.get_text())
+        image = show.img['src']
+        url = show.a['href']
         id = re.compile('/([0-9]+)/').search(url).group(1)
         year = ''
         try: year = re.compile('^([0-9]{4})').search(dateaired[i]).group(1)
@@ -596,7 +543,7 @@ def extractShows(html):
             'id' : id,
             'parentid' : -1,
             'parentname' : '',
-            'name' : common.replaceHTMLCodes(name),
+            'name' : name,
             'url' : url,
             'image' : image,
             'description' : '',
@@ -610,7 +557,7 @@ def extractShows(html):
 def getShow(showId, parentId=-1, year=''):
     logger.logInfo('called function with param (%s, %s, %s)' % (showId, str(parentId), year))
     data = {}
-    
+    import html
     showDetails = callJsonApi(config.services.get('showDetails') % showId, useCache=False)
     if showDetails.get('showabout', False) != False:
         showData = showDetails.get('showabout')[0]
@@ -633,9 +580,9 @@ def getShow(showId, parentId=-1, year=''):
         fanart = generateImageURL(showData.get('main_tcard')[0].get('image_name'), type='banner')
         banner = fanart
             
-        name = showData.get('show_title').encode('utf-8')
-        description = showData.get('synopsis').encode('utf-8')
-        genre = showData.get('keywords', '').encode('utf-8')
+        name = showData.get('show_title')
+        description = cleanTextFromHTML(showData.get('synopsis'))
+        genre = showData.get('keywords', '')
         
         actors = []
         if 'cast' in showDetails and len(showDetails.get('cast')) > 0:
@@ -643,8 +590,8 @@ def getShow(showId, parentId=-1, year=''):
             i = 1
             for cast in casts:
                 castId = cast.get('cast_id')
-                castName = cast.get('artist_name').encode('utf-8')
-                castRole = cast.get('character_name').encode('utf-8')
+                castName = cast.get('artist_name')
+                castRole = cast.get('character_name')
                 castUrl = ''
                 castImage = generateImageURL(cast.get('thumbnail'), type='cast')
                 actors.append({
@@ -672,8 +619,8 @@ def getShow(showId, parentId=-1, year=''):
             'fanart' : fanart,
             'banner' : banner,
             'url' : url,
-            'description' : common.stripTags(common.replaceHTMLCodes(description)),
-            'shortdescription' : common.stripTags(common.replaceHTMLCodes(description)),
+            'description' : description,
+            'shortdescription' : description,
             'year' : year,
             'nbEpisodes' : episodeList.get('nbEpisodes', 0),
             'episodes' : episodeList.get('episodes', []),
@@ -712,13 +659,13 @@ def getShowEpisodes(showId):
             except TypeError:
                 datePublished = datetime.datetime(*(time.strptime(episode.get('publish_date'), '%B %d, %Y')[0:6]))
             year = datePublished.strftime('%Y')
-            description = episode.get('lead').encode('utf-8')
+            description = cleanTextFromHTML(episode.get('lead'))
             data['episodes'].append({
                 'id' : episode.get('id'),
-                'title' : episode.get('title').encode('utf-8'),
+                'title' : episode.get('title'),
                 'episodenumber' : int(epNb.group(1)) if epNb != None  else 0,
-                'description' : common.stripTags(common.replaceHTMLCodes(description)),
-                'shortdescription' : common.stripTags(common.replaceHTMLCodes(description)),
+                'description' : description,
+                'shortdescription' : description,
                 'url' : episode.get('video').get('youtube'),
                 'img' : generateImageURL(episode.get('photo').get('url'), type='episode'),
                 'aired' : datePublished.strftime('%Y-%m-%d'),
@@ -845,68 +792,20 @@ def getEpisodesPerPage(showId, parentId, year, page=1, itemsPerPage=8, order='de
 
     # return sorted(data, key=lambda episode: episode['title'], reverse=True)
     return (data, hasNextPage)
-
-          
-def getEpisode(episodeId):
-    logger.logInfo('called function with param (%s)' % episodeId)
-    data = {}
-    
-    html = callServiceApi(config.uri.get('episodeDetails') % episodeId, base_url = config.websiteUrl, useCache=False)
-    err = checkIfError(html)
-    if err.get('error') == False:
-        url = common.parseDOM(html, "link", attrs = { 'rel' : 'canonical' }, ret = 'href')[0] 
-        episodeData = json.loads(re.compile('var ldj = (\{.+\})', re.IGNORECASE).search(html).group(1))
-        showId = re.compile('media/fetch.+sid: (\d+),', re.IGNORECASE).search(html).group(1)
-        res = showDB.get(showId)
-        show = res[0] if len(res) == 1 else {}
-        parentalAdvisory = 'true' if re.compile('var dfp_c = ".*2900.*";', re.IGNORECASE).search(html) else 'false'
-        plot = episodeData.get('description')
-        showName = show.get('name', episodeData.get('name'))
-        thumbnail = episodeData.get('thumbnailUrl')
-        fanart = show.get('fanart', episodeData.get('image'))
-        type = 'episode' if episodeData.get('@type' ,'episode').lower() not in ('episode','movie') else episodeData.get('@type' ,'episode').lower()
-        try:
-            datePublished = datetime.datetime.strptime(episodeData.get('datePublished'), '%Y-%m-%d')
-        except TypeError:
-            datePublished = datetime.datetime(*(time.strptime(episodeData.get('datePublished'), '%Y-%m-%d')[0:6]))
-        dateAired = datePublished.strftime('%b %d, %Y')
-        year = datePublished.strftime('%Y')
-        episodeNumber = 1 if type == 'movie' else episodeData.get('episodeNumber')
-                
-        data = {
-            'id' : int(episodeId),
-            'title' : 'Ep. %s - %s' %(episodeNumber, dateAired),
-            'parentid' : showId,
-            'show' : showName,
-            'image' : thumbnail,
-            'fanart' : fanart,
-            'episodenumber' : episodeNumber,
-            'url' : url,
-            'description' : plot,
-            'shortdescription' : plot,
-            'dateaired' : dateAired,
-            'date' : datePublished.strftime('%Y-%m-%d'),
-            'year' : year,
-            'parentalAdvisory' : parentalAdvisory,
-            'ltype' : type,
-            'type' : 'episode'
-            }
-                
-    return data
     
 def addToMyList(id, name, ltype, type):
     logger.logInfo('called function with param (%s, %s, %s, %s)' % (id, name, ltype, type))
     url = config.uri.get('addToList')
     logger.logDebug(url)
     res = {}
-    control.showNotification(control.lang(57026))
+    control.showNotification(control.lang(37026))
 
 def removeFromMyList(id, name, ltype, type):
     logger.logInfo('called function with param (%s, %s, %s, %s)' % (id, name, ltype, type))
     url = config.uri.get('removeFromList')
     logger.logDebug(url)
     res = {}
-    control.showNotification(control.lang(57026))
+    control.showNotification(control.lang(37026))
     
 def showExportedShowsToLibrary():
     data = []
@@ -916,7 +815,7 @@ def showExportedShowsToLibrary():
         if 'id' in d:
             temp[d.get('id')] = d
     if len(temp) > 0:
-        shows = showDB.get(temp.keys())
+        shows = showDB.get(list(temp.keys()))
         for s in shows:
             temp[s.get('id')].update(s)
             data.append(temp.get(s.get('id')))
@@ -929,13 +828,13 @@ def removeFromLibrary(id, name):
             path = os.path.join(control.showsLibPath, name, '')
             logger.logInfo(path)
             if logger.logInfo(control.pathExists(path)): 
-                if control.confirm(control.lang(57041), line1=control.lang(57042), title=name) == False:
+                if control.confirm('%s\n%s' % (control.lang(37041), control.lang(37042)), title=name) == False:
                     control.deleteFolder(path, True)
-            control.showNotification(control.lang(57043) % name, control.lang(50010))
+            control.showNotification(control.lang(37043) % name, control.lang(30010))
         else:
-            control.showNotification(control.lang(57044), control.lang(50004))
+            control.showNotification(control.lang(37044), control.lang(30004))
     else:
-        control.showNotification(control.lang(57045), control.lang(50001))
+        control.showNotification(control.lang(37045), control.lang(30001))
 
 
 def addToLibrary(id, name, parentId=-1, year='', updateOnly=False):
@@ -958,7 +857,7 @@ def addToLibrary(id, name, parentId=-1, year='', updateOnly=False):
             show = e.get('showObj')
             res = libraryDB.get(show.get('id'))
             lib = res[0] if len(res) == 1 else {}
-            control.writeFile(logger.logNotice(os.path.join(path, 'tvshow.nfo')), generateShowNFO(show, path).encode('utf-8'))
+            control.writeFile(logger.logNotice(str(os.path.join(path, 'tvshow.nfo'))), str(generateShowNFO(show, path)))
         except Exception as err:
             logger.logError(err)
             status = False
@@ -985,7 +884,7 @@ def addToLibrary(id, name, parentId=-1, year='', updateOnly=False):
                 if not updateOnly or updated:
                     try:
                         # Episode STRM / NFO files
-                        control.writeFile(logger.logNotice(os.path.join(path, '%s.nfo' % e.get('title').replace('|', '-'))), generateEpisodeNFO(e, path, filePath).encode('utf-8'))
+                        control.writeFile(logger.logNotice(os.path.join(path, '%s.nfo' % e.get('title').replace('|', '-'))), generateEpisodeNFO(e, path, filePath))
                         control.writeFile(logger.logNotice(filePath), navigator.navigator().generateActionUrl(str(e.get('id')), config.PLAY, '%s - %s' % (e.get('show'), e.get('dateaired')), e.get('image')))
                     except Exception as err:
                         logger.logError(err)
@@ -995,7 +894,7 @@ def addToLibrary(id, name, parentId=-1, year='', updateOnly=False):
         status = False
             
     if status == True: 
-        if not updateOnly: control.showNotification(control.lang(57034) % name, control.lang(50010))
+        if not updateOnly: control.showNotification(control.lang(37034) % name, control.lang(30010))
         libraryDB.set({'id' : int(show.get('id')), 
             'name' : show.get('name'), 
             'parentid' : int(show.get('parentid')),
@@ -1003,7 +902,7 @@ def addToLibrary(id, name, parentId=-1, year='', updateOnly=False):
             'date' : mostRecentDate.strftime('%Y-%m-%d')
             })
     else: 
-        if not updateOnly: control.showNotification(control.lang(57033), control.lang(50004))
+        if not updateOnly: control.showNotification(control.lang(37033), control.lang(30004))
     return {'status': status, 'updated': updated, 'nb': nbUpdated}
 
 def generateShowNFO(info, path):
@@ -1061,7 +960,7 @@ def checkLibraryUpdates(quiet=False):
         result = addToLibrary(show.get('id'), show.get('name'), show.get('parentid'), show.get('year'), updateOnly=True)
         if result.get('updated') == True:
             logger.logNotice('Updated %s episodes' % str(result.get('nb')))
-            if not quiet: control.showNotification(control.lang(57037) % (str(result.get('nb')), show.get('name')), control.lang(50011))
+            if not quiet: control.showNotification(control.lang(37037) % (str(result.get('nb')), show.get('name')), control.lang(30011))
         else:
             logger.logNotice('No updates for show %s' % show.get('name'))
     return True
@@ -1069,7 +968,7 @@ def checkLibraryUpdates(quiet=False):
 def enterSearch(category, type):
     logger.logInfo('called function with params (%s, %s)' % (category, type))
     data = []
-    search = control.inputText(control.lang(50204)).strip()
+    search = control.inputText(control.lang(30204)).strip()
     if len(search) >= 3:
         if category == 'movieshow':
             if type == 'title':
@@ -1087,7 +986,7 @@ def enterSearch(category, type):
             elif type == 'date':
                 data = episodeDB.searchByDate(search)
     else:
-        control.showNotification(control.lang(57046), control.lang(50001))
+        control.showNotification(control.lang(37046), control.lang(30001))
     return data
     
 def getFromCookieByName(string, startWith=False):
@@ -1117,13 +1016,13 @@ def checkIfError(html):
     message = ''
     if html == '' or html == None:
         error = True
-        message = control.lang(57029)
+        message = control.lang(37029)
     else:
-        t = common.parseDOM(html, "title")
-        if len(t) > 0:
-            if 'Error' in t[0]:
+        t = bs(html, 'html.parser').title
+        if t:
+            if 'Error' in t:
                 error = True
-                message = t[0].split(' | ')[1]
+                message = t.get_text().split(' | ')[1]
     return { 'error' : error, 'message' : message }
 
 def callServiceApi(path, params={}, headers=[], base_url=config.websiteUrl, useCache=True, jsonData=False, returnMessage=True):
@@ -1133,12 +1032,12 @@ def callServiceApi(path, params={}, headers=[], base_url=config.websiteUrl, useC
     res = {}
     cached = False
     toCache = False
-
+    
     # No cache if full response required
     if returnMessage == False:
         useCache = False
     
-    key = config.urlCachePrefix + cache.generateHashKey(base_url + path + urllib.urlencode(params))
+    key = config.urlCachePrefix + cache.generateHashKey(base_url + path + urlencode(params))
     logger.logDebug('Key %s : %s - %s' % (key, base_url + path, params))
     
     if useCache == True:
@@ -1148,14 +1047,15 @@ def callServiceApi(path, params={}, headers=[], base_url=config.websiteUrl, useC
             logger.logInfo('No cache for (%s)' % key)
         else:
             cached = True
-            res['message'] = tmp[0]
+            res['message'] = logger.logDebug(tmp[0])
             logger.logInfo('Used cache for (%s)' % key)
     
     if cached is False:
-        opener = urllib2.build_opener(urllib2.HTTPRedirectHandler(), urllib2.HTTPCookieProcessor(cookieJar))
+        opener = libRequest.build_opener(libRequest.HTTPRedirectHandler(), libRequest.HTTPCookieProcessor(cookieJar))
         userAgent = config.userAgents[base_url] if base_url in config.userAgents else config.userAgents['default']
         headers.append(('User-Agent', userAgent))
         headers.append(('Accept-encoding', 'gzip'))
+        headers.append(('Connection', 'keep-alive'))
         opener.addheaders = headers
         logger.logDebug('### Request headers, URL & params ###')
         logger.logDebug(headers)
@@ -1166,48 +1066,47 @@ def callServiceApi(path, params={}, headers=[], base_url=config.websiteUrl, useC
         try:
             if params:
                 if jsonData == True:                    
-                    request = urllib2.Request(base_url + path)
+                    request = libRequest.Request(base_url + path)
                     request.add_header('Content-Type', 'application/json')
-                    response = opener.open(request, json.dumps(params), timeout = requestTimeOut)
+                    response = opener.open(request, json.dumps(params).encode("utf-8"), timeout = requestTimeOut)
                 else:
-                    data_encoded = urllib.urlencode(params)
+                    data_encoded = urlencode(params).encode("utf-8")
                     response = opener.open(base_url + path, data_encoded, timeout = requestTimeOut)
             else:
                 response = opener.open(base_url + path, timeout = requestTimeOut)
-
+                
             logger.logDebug('### Response headers ###')
             logger.logDebug(response.geturl())
             logger.logDebug('### Response redirect URL ###')
             logger.logDebug(response.info())
             logger.logDebug('### Response ###')
             if response.info().get('Content-Encoding') == 'gzip':
-                from StringIO import StringIO
                 import gzip
-                buf = StringIO(response.read())
-                f = gzip.GzipFile(fileobj=buf)
-                res['message'] = f.read()
+                res['message'] = gzip.decompress(response.read())
             else:
                 res['message'] = response.read() if response else ''
             res['status'] = int(response.getcode())
             res['headers'] = response.info()
             res['url'] = response.geturl()
             logger.logDebug(res)
-        except (urllib2.URLError, ssl.SSLError) as e:
+        except (libRequest.URLError, ssl.SSLError) as e:
             logger.logError(e)
             message = '%s : %s' % (e, base_url + path)
             # message = "Connection timeout : " + base_url + path
             logger.logSevere(message)
-            control.showNotification(message, control.lang(50004))
+            control.showNotification(message, control.lang(30004))
             # No internet connection error
             if 'Errno 11001' in message:
                 logger.logError('Errno 11001 - No internet connection')
-                control.showNotification(control.lang(57031), control.lang(50004), time=5000)
+                control.showNotification(control.lang(37031), control.lang(30004), time=5000)
             toCache = False
             pass
         
         if toCache == True and res:
-            cache.shortCache.setMulti(key, {'url': repr(res.get('message')), 'timestamp' : time.time()})
-            logger.logDebug('Stored in cache (%s) : %s' % (key, res))
+            value = res.get('message') if re.compile('application/json', re.IGNORECASE).search('|'.join(res['headers'].keys())) or re.compile('binary/octet-stream', re.IGNORECASE).search('|'.join(res['headers'].values())) else repr(res.get('message'))
+            cache.shortCache.setMulti(key, {'url': value, 'timestamp' : time.time()})
+            logger.logDebug(res.get('message'))
+            logger.logInfo('Stored in cache (%s) : %s' % (key, {'url': value, 'timestamp' : time.time()}))
     
     # Clear headers
     headers[:] = []
@@ -1226,7 +1125,18 @@ def callJsonApi(path, params={}, headers=[('X-Requested-With', 'XMLHttpRequest')
     except:
         pass
     return data
-            
+
+def cleanTextFromHTML(text):
+    import html
+    return html.unescape(bs(text, 'html.parser').text)
+
+def unicodetoascii(text):
+    try:
+        return unidecode(text)
+    except:
+        logger.logError(text)
+        return text
+        
 # This function is a workaround to fix an issue on cookies conflict between live stream and shows episodes
 def cleanCookies(notify=True):
     logger.logInfo('called function')
@@ -1235,26 +1145,26 @@ def cleanCookies(notify=True):
         logger.logInfo('cookies file FOUND (cache)')
         try: 
             os.unlink(os.path.join(control.homePath, 'cache', 'cookies.dat'))
-            message = control.lang(57004)
+            message = control.lang(37004)
         except: 
-            message = control.lang(57005)
+            message = control.lang(37005)
                 
     elif os.path.exists(os.path.join(control.homePath, 'temp', 'cookies.dat'))==True:  
         logger.logInfo('cookies file FOUND (temp)')
         try: 
             os.unlink(os.path.join(control.homePath, 'temp', 'cookies.dat'))
-            message = control.lang(57004)
+            message = control.lang(37004)
         except: 
-            message = control.lang(57005)
+            message = control.lang(37005)
     elif os.path.exists(os.path.join(control.dataPath, config.cookieFileName))==True:  
         logger.logInfo('cookies file FOUND (profile)')
         try: 
             os.unlink(os.path.join(control.dataPath, config.cookieFileName))
-            message = control.lang(57004)
+            message = control.lang(37004)
         except: 
-            message = control.lang(57005)
+            message = control.lang(37005)
     else:
-        message = control.lang(57006)
+        message = control.lang(37006)
         
     if notify == True:
         control.showNotification(message)
@@ -1266,7 +1176,7 @@ cookieJar = cookielib.CookieJar()
 cookieFile = ''
 cookieJarType = ''
 
-if os.path.exists(control.dataPath):
+if control.pathExists(control.dataPath):
     cookieFile = os.path.join(control.dataPath, config.cookieFileName)
     cookieJar = cookielib.LWPCookieJar(cookieFile)
     cookieJarType = 'LWPCookieJar'

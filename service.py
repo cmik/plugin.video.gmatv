@@ -6,11 +6,12 @@
     Copyright (C) 2020 cmik
 '''
 
-import SocketServer,re,shutil,threading,urllib,urllib2,ssl,cookielib,time
-import xbmc,xbmcaddon
-
-from SimpleHTTPServer import SimpleHTTPRequestHandler
-from urlparse import urlparse, parse_qsl
+import re,shutil,threading,ssl,time,xbmc,xbmcaddon
+import http.cookiejar as cookielib
+from six.moves import socketserver
+from urllib import request as libRequest
+from urllib.parse import quote,urlencode,urlparse,parse_qsl
+from http.server import SimpleHTTPRequestHandler
 from resources import config
 from resources.lib.libraries import control
 
@@ -21,9 +22,11 @@ class ProxyHandler(SimpleHTTPRequestHandler):
     _websiteUrl = config.websiteUrl
             
     def do_GET(self):
-        xbmc.log('Requested : %s' % (self.path), level=xbmc.LOGDEBUG)
+        xbmc.log('Requested GET: %s' % (self.path), level=xbmc.LOGDEBUG)
         if '/healthcheck' in self.path:
             self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
         else:
             query = self.getQueryParameters(self.path)
             if ('url' in query):
@@ -61,14 +64,14 @@ class ProxyHandler(SimpleHTTPRequestHandler):
                         
     def urlopen(self, url, params = {}, headers = []):        
         res = {}
-        opener = urllib2.build_opener(urllib2.HTTPRedirectHandler(), urllib2.HTTPCookieProcessor(self._cj))
+        opener = libRequest.build_opener(libRequest.HTTPRedirectHandler(), libRequest.HTTPCookieProcessor(self._cj))
         opener.addheaders = headers
         requestTimeOut = int(xbmcaddon.Addon().getSetting('requestTimeOut')) if xbmcaddon.Addon().getSetting('requestTimeOut') != '' else 20
         response = None
         
         try:
             if params:
-                data_encoded = urllib.urlencode(params)
+                data_encoded = urlencode(params)
                 response = opener.open(url, data_encoded, timeout = requestTimeOut)
             else:
                 response = opener.open(url, timeout = requestTimeOut)
@@ -77,7 +80,7 @@ class ProxyHandler(SimpleHTTPRequestHandler):
             res['status'] = response.getcode()
             res['headers'] = response.info()
             res['url'] = response.geturl()
-        except (urllib2.URLError, ssl.SSLError) as e:
+        except (libRequest.URLError, ssl.SSLError) as e:
             message = '%s : %s' % (e, url)
             xbmc.log(message, level=xbmc.LOGERROR)
         
@@ -111,11 +114,11 @@ class LibraryChecker():
         
 if __name__ == "__main__":
     httpPort = int(control.setting('proxyPort'))
-    server = SocketServer.TCPServer(('', httpPort), ProxyHandler)
+    server = socketserver.TCPServer(('', httpPort), ProxyHandler)
 
     server_thread = threading.Thread(target=server.serve_forever)
     server_thread.start()
-    xbmc.log('[%s] Service: starting HTTP proxy server on port %s' % (control.addonInfo('name'), httpPort), level=xbmc.LOGNOTICE)
+    xbmc.log('[%s] Service: starting HTTP proxy server on port %s' % (control.addonInfo('name'), httpPort), level=xbmc.LOGINFO)
     
     libActive = True if control.setting('libraryAutoUpdate') == 'true' else False
     
@@ -123,7 +126,7 @@ if __name__ == "__main__":
         libChecker = LibraryChecker()
         libSchedTask = threading.Thread(target=libChecker.checkLibraryUpdates)
         libSchedTask.start()
-        xbmc.log('[%s] Service: starting GMA library checker' % control.addonInfo('name'), level=xbmc.LOGNOTICE)
+        xbmc.log('[%s] Service: starting library checker' % control.addonInfo('name'), level=xbmc.LOGINFO)
     
     monitor = xbmc.Monitor()
 
@@ -135,8 +138,8 @@ if __name__ == "__main__":
 
     server.shutdown()
     server_thread.join()
-    xbmc.log('[%s] - Service: stopping HTTP proxy server on port %s' % (control.addonInfo('name'), httpPort), level=xbmc.LOGNOTICE)
+    xbmc.log('[%s] - Service: stopping HTTP proxy server on port %s' % (control.addonInfo('name'), httpPort), level=xbmc.LOGINFO)
     if libActive == True: 
         libChecker.shutdown()
         libSchedTask.join()
-        xbmc.log('[%s] - Service: stopping GMA library checker' % control.addonInfo('name'), level=xbmc.LOGNOTICE)
+        xbmc.log('[%s] - Service: stopping library checker' % control.addonInfo('name'), level=xbmc.LOGINFO)

@@ -1,3 +1,5 @@
+1.0.0
+    GMA.tv version for Kodi 19+
 0.2.0
     Repo has been removed from addon.xml to avoid multiple repo for the same add-ons
     To keep your add-on up to date, install Cmik Repo from https://repo.cmik.me/repository/

@@ -5,8 +5,8 @@
     Copyright (C) 2020 cmik
 '''
 
-
-import sys,urllib,urlparse,time
+from urllib.parse import parse_qsl,unquote_plus
+import sys,time
 from resources import config
 from resources.lib.libraries import control
 from resources.lib.libraries import tools
@@ -25,7 +25,7 @@ exec_start=time.time()
     
 logger.logInfo(sys.argv[2])
 
-params = dict(urlparse.parse_qsl(sys.argv[2].replace('?','')))
+params = dict(parse_qsl(sys.argv[2].replace('?','')))
 
 action = params.get('action')
 
@@ -51,14 +51,16 @@ image = params.get('image')
 
 caller = params.get('caller', 'addon')
 
-thumbnail = urllib.unquote_plus(params.get('thumbnail', ''))
+thumbnail = unquote_plus(params.get('thumbnail', ''))
 
 
 # if caller == 'addon' and control.setting('addonNewInstall') == 'true' and control.setting('lastVersion') != control.addonInfo('version'):
 if caller == 'addon' and control.setting('lastVersion') != control.addonInfo('version'):
     from resources import upgrade
-    control.showMessage(control.lang(57023) % control.addonInfo('version'), control.lang(50002))
+    logger.logInfo(control.lang(37023))
+    control.showMessage(control.lang(37023) % control.addonInfo('version'), control.lang(30002))
     upgrade.upgradeDB()
+    upgrade.upgradeSettings()
     control.setSetting('lastVersion', control.addonInfo('version'))
 
 if mode == None:
