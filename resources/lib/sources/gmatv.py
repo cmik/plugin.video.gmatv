@@ -645,11 +645,18 @@ def getShowEpisodes(showId):
         }
     episodesList = []
     nbEpisodePages = callJsonApi(config.services.get('showNbFullEpisodePages') % showId, useCache = False)
-    nbPages = int(nbEpisodePages.get('count')) if 'count' in nbEpisodePages else 0
-    for page in range(1, nbPages+1, 1):
-        pageData = callJsonApi(config.services.get('fullEpisodesPerPage') % (showId, page), useCache = False)
-        if 'status' in pageData and pageData.get('status') == '200':
-            episodesList += pageData.get('data')
+    nbPages = 0
+    if 'count' in nbEpisodePages:
+        if nbEpisodePages.get('count') != 'all':
+            nbPages = int(nbEpisodePages.get('count'))
+            for page in range(1, nbPages+1, 1):
+                pageData = callJsonApi(config.services.get('fullEpisodesPerPage') % (showId, page), useCache = False)
+                if 'status' in pageData and pageData.get('status') == '200':
+                    episodesList += pageData.get('data')
+        else:
+            pageData = callJsonApi(config.services.get('fullEpisodesPerPage') % (showId, 'all'), useCache = False)
+            if 'status' in pageData and pageData.get('status') == '200':
+                episodesList += pageData.get('data')
     if len(episodesList) > 0:
         data['nbEpisodes'] = len(episodesList)
         for episode in episodesList:
