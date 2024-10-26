@@ -30,9 +30,10 @@ class ShowCast(model.Model):
                 }
         return {}
     
-    def _search(self, search, limit):
+    def _search(self, search, sort, limit):
         dbcur = self.getCursor()
-        where = ["%s LIKE '%%%s%%'" % (str(k), str(v)) for k,v in search.iteritems()]
+        where = ["%s LIKE '%%%s%%'" % (str(k), str(v)) for k,v in search.items()]
+        sortBy = 'ORDER BY %s %s' % (sort[0], sort[1]) if sort != False else ''
         first = 'LIMIT %d' % int(limit) if limit != False else ''
         dbcur.execute(logger.logDebug("SELECT ID, \
             SHOWID, \
@@ -43,7 +44,7 @@ class ShowCast(model.Model):
             ORDR, \
             URL \
             FROM SHOW_CAST \
-            WHERE %s %s" % (' AND '.join(where), first)))
+            WHERE %s %s %s" % (' AND '.join(where), sortBy, first)))
         return logger.logDebug(dbcur.fetchall())
 
     def _retrieveAll(self):
@@ -141,7 +142,7 @@ class ShowCast(model.Model):
         return self.get(mixed, 'SHOWID')
 
     def searchByActorName(self, name, limit=100):
-        return self.search({'NAME' : name})
+        return self.search({'NAME' : name}, ['NAME', 'ASC'], limit)
 
     def checkIfTableExists(self):
         dbcur = self.getCursor()

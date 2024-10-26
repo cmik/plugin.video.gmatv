@@ -632,7 +632,8 @@ def getShow(showId, parentId=-1, year=''):
             'votes' : 0,
             'type': 'show'
             }
-        showDB.set(data)
+        if episodeList.get('fromBase', False) == False:
+            showDB.set(data)
     else:
         logger.logWarning('Error on show %s: %s' % (showId, 'no data found'))
     return data
@@ -641,11 +642,13 @@ def getShowEpisodes(showId):
     logger.logInfo('called function with param (%s)' % (showId))
     data = {
         'nbEpisodes': 0,
-        'episodes': []
+        'episodes': [],
+        'fromBase': False
         }
     episodesList = []
     nbEpisodePages = callJsonApi(config.services.get('showNbFullEpisodePages') % showId, useCache = False)
     nbPages = 0
+    fromBase = False
     if 'count' in nbEpisodePages:
         if nbEpisodePages.get('count') != 'all':
             nbPages = int(nbEpisodePages.get('count'))
@@ -657,8 +660,15 @@ def getShowEpisodes(showId):
             pageData = callJsonApi(config.services.get('fullEpisodesPerPage') % (showId, 'all'), useCache = False)
             if 'status' in pageData and pageData.get('status') == '200':
                 episodesList += pageData.get('data')
-    if len(episodesList) > 0:
-        data['nbEpisodes'] = len(episodesList)
+            else:
+                episodesList = episodeDB.getByShow(showId, 500)
+                fromBase = True
+                data['fromBase'] = True
+                data['episodes'] = episodesList
+
+    data['nbEpisodes'] = len(episodesList)
+
+    if len(episodesList) > 0 and not fromBase:
         for episode in episodesList:
             epNb = re.compile('Episode +([0-9]+)', re.IGNORECASE).search(episode.get('title'))
             try:
@@ -747,11 +757,11 @@ def getEpisodesPerPage(showId, parentId, year, page=1, itemsPerPage=8, order='de
 
             # Calculating episode index according to page and items per page
             episodeIndex = (page * 1 - 1) * itemsPerPage
-
             for index in range(episodeIndex, episodeIndex+itemsPerPage, 1):
                 if index >= nbEpisodes:
                     break
 
+                logger.logDebug('Episode index : %s' % index)
                 episodeData = episodes[index]
                 url = episodeData.get('url')
                 episodeId = int(episodeData.get('id'))
@@ -994,6 +1004,10 @@ def enterSearch(category, type):
                 data = episodeDB.searchByDate(search)
     else:
         control.showNotification(control.lang(37046), control.lang(30001))
+    if data == []:
+        control.showNotification(control.lang(37047), control.lang(30001))
+    else:
+        control.showNotification(control.lang(37048) % len(data), control.lang(30001))
     return data
     
 def getFromCookieByName(string, startWith=False):

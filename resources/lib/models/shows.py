@@ -38,9 +38,10 @@ class Show(model.Model):
                 }
         return {}
     
-    def _search(self, search, limit):
+    def _search(self, search, sort, limit):
         dbcur = self.getCursor()
-        where = ["%s LIKE '%%%s%%'" % (str(k), str(v)) for k,v in search.iteritems()]
+        where = ["%s LIKE '%%%s%%'" % (str(k), str(v)) for k,v in search.items()]
+        sortBy = 'ORDER BY %s %s' % (sort[0], sort[1]) if sort != False else ''
         first = 'LIMIT %d' % int(limit) if limit != False else ''
         dbcur.execute(logger.logDebug("SELECT ID, \
             TITLE, \
@@ -60,7 +61,7 @@ class Show(model.Model):
             RATING, \
             VOTES \
             FROM SHOW \
-            WHERE %s %s" % (' AND '.join(where), first)))
+            WHERE %s %s %s" % (' AND '.join(where), sortBy, first)))
         return logger.logDebug(dbcur.fetchall())
 
     def _retrieveAll(self):
@@ -194,13 +195,13 @@ class Show(model.Model):
             return False
 
     def searchByTitle(self, title, limit=100):
-        return self.search({'TITLE' : title}, limit)
+        return self.search({'TITLE' : title}, ['NAME', 'ASC'], limit)
 
     def searchByCategory(self, category, limit=100):
-        return self.search({'PARENTNAME' : category}, limit)
+        return self.search({'PARENTNAME' : category}, ['NAME', 'ASC'], limit)
 
     def searchByYear(self, year, limit=100):
-        return self.search({'YEAR' : year}, limit)
+        return self.search({'YEAR' : year}, ['NAME', 'ASC'], limit)
 
     def checkIfTableExists(self):
         dbcur = self.getCursor()

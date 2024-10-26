@@ -1,3 +1,6 @@
+1.0.2
+    Fixed search
+    Retrieve episodes from database if episodes list from site is not available
 1.0.1
     Fixed error when displaying show's content
 1.0.0

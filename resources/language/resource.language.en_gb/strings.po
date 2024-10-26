@@ -554,3 +554,11 @@ msgstr ""
 msgctxt "#37046"
 msgid "Please type at least 3 charaters for search"
 msgstr ""
+
+msgctxt "#37047"
+msgid "No result"
+msgstr ""
+
+msgctxt "#37048"
+msgid "Found %s result(s)"
+msgstr ""

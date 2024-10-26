@@ -100,7 +100,7 @@ class Library(model.Model):
         try: 
             dbcur.execute(logger.logDebug("DROP TABLE LIBRARY_SHOW"))
             self._dbcon.commit()
-            return Trues
+            return True
         except: 
             return False
 

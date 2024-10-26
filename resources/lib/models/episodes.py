@@ -47,9 +47,10 @@ class Episode(model.Model):
                 }
         return {}
     
-    def _search(self, search, limit):
+    def _search(self, search, sort, limit):
         dbcur = self.getCursor()
-        where = ["%s LIKE '%%%s%%'" % (str(k), str(v)) for k,v in search.iteritems()]
+        where = ["%s LIKE '%%%s%%'" % (str(k), str(v)) for k,v in search.items()]
+        sortBy = 'ORDER BY %s %s' % (sort[0], sort[1]) if sort != False else ''
         first = 'LIMIT %d' % int(limit) if limit != False else ''
         dbcur.execute(logger.logInfo("SELECT ID, \
             TITLE, \
@@ -70,7 +71,7 @@ class Episode(model.Model):
             RATING, \
             VOTES \
             FROM EPISODE \
-            WHERE %s %s" % (' AND '.join(where), first)))
+            WHERE %s %s %s" % (' AND '.join(where), sortBy, first)))
         return logger.logDebug(dbcur.fetchall())
 
     def _retrieveAll(self):
@@ -204,11 +205,14 @@ class Episode(model.Model):
         except: 
             return False
 
+    def getByShow(self, showid, limit=100):
+        return self.search({'SHOWID' : showid}, ['EPISODENUMBER', 'ASC'], limit)
+
     def searchByTitle(self, title, limit=100):
-        return self.search({'TITLE' : title}, limit)
+        return self.search({'TITLE' : title}, ['TITLE', 'ASC'], limit)
 
     def searchByDate(self, date, limit=100):
-        return self.search({'DATEAIRED' : date}, limit)
+        return self.search({'DATEAIRED' : date}, ['TITLE', 'ASC'], limit)
 
     def checkIfTableExists(self):
         dbcur = self.getCursor()

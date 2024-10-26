@@ -24,7 +24,7 @@ class Model():
     def _getStructure(self, data):
         return {}
         
-    def _search(self, limit):
+    def _search(self, sort, limit):
         return []
 
     def _retrieveAll(self):
@@ -42,11 +42,11 @@ class Model():
     def getCursor(self):
         return self._dbcon.cursor()
     
-    def search(self, search, limit=False):
+    def search(self, search, sort=False, limit=False):
         items = []
         if isinstance(search, dict):
             try:
-                results = self._search(search, limit)
+                results = self._search(search, sort, limit)
                 for d in results:
                     items.append(self._getStructure(d))
             except (Exception) as e:
