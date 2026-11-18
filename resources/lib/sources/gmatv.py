@@ -182,33 +182,30 @@ def getSiteMenu():
     logger.logInfo('called function')
     data = []
     
-    html = bs(callServiceApi(config.uri.get('base'), base_url = config.websiteUrl), 'html.parser')
-    menu = html.find("div", attrs = { 'id' : 'main_nav_desk' }).get_text()
-    
-    for category in html.find_all("li", attrs = { 'class' : 'has_children' }):
-        
+    # categories = sections of GMA Play (Shows, Movies...), sub categories = their shelves
+    sectionList = callJsonApi(config.services.get('sectionList'))
+    for section in sectionList.get('data', []) if isinstance(sectionList, dict) else []:
+        sectionId = section.get('section_id')
+        if not sectionId:
+            continue
+        sectionPage = callJsonApi(config.services.get('sectionPage') % sectionId)
         subCategories = []
-        name = category.a.get_text()
-        id = category.a['data-id']
-        url = category.a['href']
+        for shelf in sectionPage.get('shelves', []) if isinstance(sectionPage, dict) else []:
+            if shelf.get('shelf_id'):
+                subCategories.append({
+                    'id' : str(shelf.get('shelf_id')), 
+                    'name' : shelf.get('label', ''), 
+                    'url' : ''
+                    })
         
-        for subcat in category.find("ul", attrs = { 'class' : 'menu_item' }).li:
-            subcatname = subcat.a.get_text()
-            subcaturl = subcat.a['href']
-            id = re.compile('/([0-9]+)/', re.IGNORECASE).search(subcaturl).group(1)
-        
-            subCategories.append({
-                'id' : str(id), 
-                'name' : subcatname, 
-                'url' : subcaturl
+        # a section without shelf (Library) has nothing to browse
+        if len(subCategories) > 0:
+            data.append({
+                'id' : str(sectionId), 
+                'name' : section.get('name', ''), 
+                'url' : '', 
+                'subcat' : subCategories
                 })
-        
-        data.append({
-            'id' : str(id), 
-            'name' : name, 
-            'url' : url, 
-            'subcat' : subCategories
-            })
     return data
     
 def getCategories():
@@ -477,83 +474,16 @@ def generateImageURL(image, type='poster', res='high'):
 def getShows(subCategoryId, page = 1):
     logger.logInfo('called function with param (%s, %s)' % (subCategoryId, page))
     data = []
-    subCategoryShows = []    
     
-    html = bs(callServiceApi(config.uri.get('categoryList') % subCategoryId), 'html.parser')
-    subCategoryShows.append(extractShows(html))
-    
-    pages = html.find('ul', attrs = { 'id' : 'pagination' }).find_all('a')
-    if len(pages) > 1:
-        for url in pages[1:]:
-            subCategoryShows.append(extractShows(callServiceApi(url['href'])))
-    
-    if len(subCategoryShows) > 0:
-        for sub in subCategoryShows:
-            for d in sub:
-                description = d['blurb'] if 'blurb' in d else ''
-                dateAired = d['dateairedstr'] if 'dateairedstr' in d else ''
-                res = showDB.get(int(d['id']))
-                if len(res) == 1:
-                    show = res[0]
-                    show['parentid'] = int(subCategoryId)
-                    show['parentname'] = d['parentname']
-                    show['year'] = d['year']
-                    show['casts'] = castDB.getByShow(int(d['id']))
-                    data.append(show)
-                else:
-                    data.append({
-                        'id' : int(d['id']),
-                        'name' : d['name'],
-                        'parentid' : int(subCategoryId),
-                        'parentname' : d['parentname'],
-                        'logo' : d['image'].replace(' ', '%20'),
-                        'image' : d['image'].replace(' ', '%20'),
-                        'fanart' : d['image'].replace(' ', '%20'),
-                        'banner' : d['image'].replace(' ', '%20'),
-                        'url' : d['url'],
-                        'description' : d['description'],
-                        'shortdescription' : d['shortdescription'],
-                        'year' : d['year'],
-                        'type' : 'show',
-                        'ltype' : 'show'
-                        })
+    shelf = callJsonApi(config.services.get('sectionDetails') % subCategoryId, useCache=False)
+    for show in shelf.get('shows', []) if isinstance(shelf, dict) else []:
+        try:
+            data.append(extractWebsiteSectionShowData(show))
+        except Exception as e:
+            logger.logError('Can\'t read show %s of the shelf %s : %s' % (show.get('id'), subCategoryId, str(e)))
                 
     return data
     
-def extractShows(html):
-    logger.logInfo('called function')
-    data = []
-    list = html.find("ul", attrs = { 'id' : 'og-grid' })
-    shows = list.find_all("li", attrs = { 'class' : 'og-grid-item-o' })
-    dateaired = list.find("li", attrs = { 'class' : 'og-grid-item-o' })['data-aired']
-    i = 0
-    for show in shows:
-        name = unicodetoascii(show.h2.get_text())
-        aired = unicodetoascii(show.h3.get_text())
-        image = show.img['src']
-        url = show.a['href']
-        id = re.compile('/([0-9]+)/').search(url).group(1)
-        year = ''
-        try: year = re.compile('^([0-9]{4})').search(dateaired[i]).group(1)
-        except:
-            try: year = aired.replace('AIRED: ', '').split(' ')[1]
-            except: pass
-        
-        data.append({
-            'id' : id,
-            'parentid' : -1,
-            'parentname' : '',
-            'name' : name,
-            'url' : url,
-            'image' : image,
-            'description' : '',
-            'shortdescription' : '',
-            'dateairedstr' : aired.replace('AIRED: ', ''),
-            'year' : year
-            })
-        i+=1    
-    return data
-
 def getShow(showId, parentId=-1, year=''):
     logger.logInfo('called function with param (%s, %s, %s)' % (showId, str(parentId), year))
     data = {}
