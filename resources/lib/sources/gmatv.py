@@ -705,7 +705,7 @@ def getEpisodesPerPage(showId, parentId, year, page=1, itemsPerPage=8, order='de
         if nbEpisodes == 1 and showDetails.get('ltype', '') in ('movie', 'episode'):
             html = callServiceApi(config.uri.get('showDetails') % showId, useCache=False)
             episodeId = int(re.compile('var dfp_e = "(.+)";', re.IGNORECASE).search(html).group(1))
-            episodeData = json.loads(re.compile('var ldj = (\{.+\})', re.IGNORECASE).search(html).group(1))
+            episodeData = json.loads(re.compile(r'var ldj = (\{.+\})', re.IGNORECASE).search(html).group(1))
 
             res = episodeDB.get(episodeId)
             if len(res) == 1:
