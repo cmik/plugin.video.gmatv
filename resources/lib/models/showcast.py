@@ -81,7 +81,7 @@ class ShowCast(model.Model):
             if 'id' in data or ('showid' in data and 'castid' in data):
                 dbcur = self.getCursor()
                 dbcur.execute('PRAGMA encoding="UTF-8";')
-                for k, e in data.iteritems():
+                for k, e in data.items():
                     query = "UPDATE SHOW_CAST SET "
                     query += "SHOWID = %d, " % data.get('showid') if data.get('showid', False) else "SHOWID = SHOWID, "
                     query += "ACTORID = %d, " % data.get('castid') if data.get('castid', False) else "ACTORID = ACTORID, "

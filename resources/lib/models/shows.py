@@ -116,7 +116,7 @@ class Show(model.Model):
             if 'id' in data:
                 dbcur = self.getCursor()
                 dbcur.execute('PRAGMA encoding="UTF-8";')
-                for k, e in data.iteritems():
+                for k, e in data.items():
                     query = "UPDATE SHOW SET "
                     query += "TITLE = '%s', " % data.get('name') if data.get('name', False) else "TITLE = TITLE, "
                     query += "PARENTID = '%s', " % data.get('parentid') if data.get('parentid', False) else "PARENTID = PARENTID, "

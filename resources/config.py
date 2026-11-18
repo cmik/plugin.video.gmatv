@@ -21,6 +21,7 @@ websiteUrl = 'https://www.gmanetwork.com'
 websiteSecuredUrl = 'https://www.gmanetwork.com'
 websiteCDNUrl = 'https://aphrodite.gmanetwork.com'
 youtubeVideoUrl = 'https://www.youtube.com/watch?v=%s'
+youtubeThumbnailUrl = 'https://img.youtube.com/vi/%s/mqdefault.jpg'
 uri = {
     'base' : '/fullepisodes/',
     'search' : '/fullepisodes/search?q=%s',
