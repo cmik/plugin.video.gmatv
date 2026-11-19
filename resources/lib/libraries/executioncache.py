@@ -16,7 +16,7 @@ class ExecutionCache:
         hash = ''
         for p in args:
             if isinstance(p, dict):
-                for key in sorted(p.iterkeys()):
+                for key in sorted(p.keys()):
                     hash += "'%s'='%s'" % (key, p[key])
             elif isinstance(p, list):
                 hash += ",".join(["%s" % el for el in p])

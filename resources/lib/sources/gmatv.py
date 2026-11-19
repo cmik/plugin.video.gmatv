@@ -459,6 +459,14 @@ def extractWebsiteSectionShowData(show):
             'year' : year
             }
 
+def episodeThumbnail(episode):
+    # GMA Play shows the YouTube thumbnail of the video; the image of the episode (videos/images) is only a fallback
+    youtubeId = (episode.get('video') or {}).get('youtube')
+    if youtubeId:
+        return config.youtubeThumbnailUrl % youtubeId
+    photo = (episode.get('photo') or {}).get('url')
+    return generateImageURL(photo, type='episode') if photo else ''
+
 def generateImageURL(image, type='poster', res='high'):
     img = 'image' 
     if type in 'poster':
@@ -614,7 +622,7 @@ def getShowEpisodes(showId):
                 'description' : description,
                 'shortdescription' : description,
                 'url' : episode.get('video').get('youtube'),
-                'img' : generateImageURL(episode.get('photo').get('url'), type='episode'),
+                'img' : episodeThumbnail(episode),
                 'aired' : datePublished.strftime('%Y-%m-%d'),
                 })
 
@@ -703,6 +711,8 @@ def getEpisodesPerPage(showId, parentId, year, page=1, itemsPerPage=8, order='de
                         e['title'] = episodeData.get('title')
                         e['episodenumber'] = episodeData.get('episodenumber')
                         e['showObj'] = showDetails
+                        # the thumbnail stored by an older version may no longer exist
+                        if episodeData.get('img'): e['image'] = episodeData.get('img')
                     data.append(e)
                 else:
                     image = episodeData.get('img')
