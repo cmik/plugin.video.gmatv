@@ -36,6 +36,8 @@ uri = {
     'cast' : '/entertainment/tv/castinformation/640_480_%s',
 }
 services = {
+    'sectionList' : '/entertainment/fulleps/section_list.gz',
+    'sectionPage' : '/entertainment/fulleps/sections/%s.gz',
     'sections' : '/entertainment/fulleps/sections/home.gz',
     'sectionDetails' : '/entertainment/fulleps/shelves/%s.gz',
     'showDetails' : '/entertainment/tv/%s/show_details.gz',
