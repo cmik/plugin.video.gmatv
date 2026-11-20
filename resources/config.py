@@ -36,6 +36,9 @@ uri = {
     'castLowRes' : '/entertainment/tv/castinformation/320_240_%s',
     'cast' : '/entertainment/tv/castinformation/640_480_%s',
 }
+# sections of GMA Play the add-on can not read yet: the movies have their own id space (origin 'fulleps',
+# tv/fulleps/<id>/... endpoints, ids that collide with the shows)
+unsupportedSections = ('movies',)
 services = {
     'sectionList' : '/entertainment/fulleps/section_list.gz',
     'sectionPage' : '/entertainment/fulleps/sections/%s.gz',

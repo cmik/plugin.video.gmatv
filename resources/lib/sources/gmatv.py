@@ -205,6 +205,9 @@ def getSiteMenu():
         sectionId = section.get('section_id')
         if not sectionId:
             continue
+        # TODO movies: their shows are in another id space (origin 'fulleps'), not supported yet
+        if section.get('section_code') in config.unsupportedSections:
+            continue
         sectionPage = callJsonApi(config.services.get('sectionPage') % sectionId)
         subCategories = []
         for shelf in sectionPage.get('shelves', []) if isinstance(sectionPage, dict) else []:
