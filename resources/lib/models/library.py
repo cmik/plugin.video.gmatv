@@ -57,7 +57,7 @@ class Library(model.Model):
             DATE, \
             LASTCHECK \
             FROM LIBRARY_SHOW \
-            WHERE %s IN (%s)" % (key, ','.join(str(v) for v in mixed))))
+            WHERE %s IN (%s)" % (self._column(key), self._marks(mixed))), list(mixed))
         return logger.logDebug(dbcur.fetchall())
        
     def _save(self, mixed):
@@ -69,15 +69,15 @@ class Library(model.Model):
             self.checkIfTableExists()
             dbcur = self.getCursor()
             dbcur.execute('PRAGMA encoding="UTF-8";')
-            dbcur.execute(logger.logDebug("DELETE FROM LIBRARY_SHOW WHERE ID in (%s)" % ','.join(ids)))
+            dbcur.execute(logger.logDebug("DELETE FROM LIBRARY_SHOW WHERE ID in (%s)" % self._marks(ids)), ids)
             for data in mixed:
-                dbcur.execute(logger.logDebug("INSERT INTO LIBRARY_SHOW VALUES (%d, '%s', %d, '%s', '%s', '%s')" % (
+                dbcur.execute("INSERT INTO LIBRARY_SHOW VALUES (?, ?, ?, ?, ?, ?)", (
                     data.get('id'), 
-                    data.get('name').replace('\'', '\'\''), 
+                    data.get('name'), 
                     data.get('parentid'),
                     data.get('year'), 
                     data.get('date'), 
-                    datetime.now().strftime('%Y-%m-%d %H:%M:%S'))))
+                    datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
             self._dbcon.commit()
             return True
         return False
@@ -88,7 +88,7 @@ class Library(model.Model):
         if len(ids) > 0:
             dbcur = self.getCursor()
             try: 
-                dbcur.execute(logger.logDebug("DELETE FROM LIBRARY_SHOW WHERE ID in (%s)" % ','.join(ids)))
+                dbcur.execute(logger.logDebug("DELETE FROM LIBRARY_SHOW WHERE ID in (%s)" % self._marks(ids)), ids)
                 self._dbcon.commit()
                 return True
             except: 

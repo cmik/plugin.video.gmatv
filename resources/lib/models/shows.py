@@ -54,8 +54,8 @@ class Show(model.Model):
 
     def _search(self, search, sort, limit):
         dbcur = self.getCursor()
-        where = ["%s LIKE '%%%s%%'" % (str(k), str(v)) for k,v in search.items()]
-        sortBy = 'ORDER BY %s %s' % (sort[0], sort[1]) if sort != False else ''
+        where, params = self._where(search)
+        sortBy = self._sortBy(sort)
         first = 'LIMIT %d' % int(limit) if limit != False else ''
         dbcur.execute(logger.logDebug("SELECT ID, \
             TITLE, \
@@ -75,7 +75,7 @@ class Show(model.Model):
             RATING, \
             VOTES \
             FROM SHOW \
-            WHERE %s %s %s" % (' AND '.join(where), sortBy, first)))
+            WHERE %s %s %s" % (where, sortBy, first)), params)
         return logger.logDebug(dbcur.fetchall())
 
     def _retrieveAll(self):
@@ -120,7 +120,7 @@ class Show(model.Model):
             RATING, \
             VOTES \
             FROM SHOW \
-            WHERE %s IN (%s)" % (key, ','.join("'%s'" % str(v) for v in mixed))))
+            WHERE %s IN (%s)" % (self._column(key), self._marks(mixed))), list(mixed))
         return logger.logDebug(dbcur.fetchall())
 
     def _save(self, mixed):
@@ -131,24 +131,21 @@ class Show(model.Model):
                 dbcur = self.getCursor()
                 dbcur.execute('PRAGMA encoding="UTF-8";')
                 self._saveUserData(data)
-                for k, e in data.items():
-                    query = "UPDATE SHOW SET "
-                    query += "TITLE = '%s', " % data.get('name') if data.get('name', False) else "TITLE = TITLE, "
-                    query += "PARENTID = '%s', " % data.get('parentid') if data.get('parentid', False) else "PARENTID = PARENTID, "
-                    query += "PARENTNAME = '%s', " % data.get('parentname') if data.get('parentname', False) else "PARENTNAME = PARENTNAME, "
-                    query += "THUMBNAIL = '%s', " % data.get('logo') if data.get('logo', False) else "THUMBNAIL = THUMBNAIL, "
-                    query += "FANART = '%s', " % data.get('image') if data.get('image', False) else "FANART = FANART, "
-                    query += "IMAGE = '%s', " % data.get('fanart') if data.get('fanart', False) else "IMAGE = IMAGE, "
-                    query += "BANNER = '%s', " % data.get('banner') if data.get('banner', False) else "BANNER = BANNER, "
-                    query += "URL = '%s', " % data.get('url') if data.get('url', False) else "URL = URL, "
-                    query += "DESCRIPTION = '%s', " % data.get('description') if data.get('description', False) else "DESCRIPTION = DESCRIPTION, "
-                    query += "SHORTDESCRIPTION = '%s', " % data.get('shortdescription') if data.get('shortdescription', False) else "SHORTDESCRIPTION = SHORTDESCRIPTION, "
-                    query += "YEAR = '%s', " % data.get('year') if data.get('year', False) else "YEAR = YEAR, "
-                    query += "TYPE = '%s', " % data.get('ltype') if data.get('ltype', False) else "TYPE = TYPE, "
-                    query += "DURATION = %d, " % data.get('duration') if data.get('duration', False) else "DURATION = DURATION, "
-                    query += "VIEWS = VIEWS, RATING = RATING, VOTES = VOTES "
-                    query += "WHERE ID = %d" % data.get('id')
-                    dbcur.execute(logger.logDebug(query))
+                self._update(dbcur, 'SHOW', [
+                    ('TITLE', data.get('name')),
+                    ('PARENTID', data.get('parentid')),
+                    ('PARENTNAME', data.get('parentname')),
+                    ('THUMBNAIL', data.get('logo')),
+                    ('FANART', data.get('image')),
+                    ('IMAGE', data.get('fanart')),
+                    ('BANNER', data.get('banner')),
+                    ('URL', data.get('url')),
+                    ('DESCRIPTION', data.get('description')),
+                    ('SHORTDESCRIPTION', data.get('shortdescription')),
+                    ('YEAR', data.get('year')),
+                    ('TYPE', data.get('ltype')),
+                    ('DURATION', data.get('duration')),
+                    ], data.get('id'))
         self._dbcon.commit()
         return True
 
@@ -159,26 +156,26 @@ class Show(model.Model):
             self.checkIfTableExists()
             dbcur = self.getCursor()
             dbcur.execute('PRAGMA encoding="UTF-8";')
-            dbcur.execute(logger.logDebug("DELETE FROM SHOW WHERE ID in (%s)" % ','.join(ids)))
+            dbcur.execute(logger.logDebug("DELETE FROM SHOW WHERE ID in (%s)" % self._marks(ids)), ids)
             for data in mixed:
-                dbcur.execute(logger.logDebug("INSERT INTO SHOW VALUES (%d, '%s', %d, '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', %d, %d, %d, %d)" % (
+                dbcur.execute("INSERT INTO SHOW VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (
                     data.get('id'), 
-                    data.get('name').replace('\'', '\'\''), 
+                    data.get('name'), 
                     data.get('parentid'), 
-                    data.get('parentname').replace('\'', '\'\''), 
-                    data.get('logo').replace('&#39;', '\'\''), 
-                    data.get('image').replace('&#39;', '\'\''), 
-                    data.get('fanart').replace('&#39;', '\'\''), 
-                    data.get('banner').replace('&#39;', '\'\''), 
+                    data.get('parentname'), 
+                    data.get('logo').replace('&#39;', '\''), 
+                    data.get('image').replace('&#39;', '\''), 
+                    data.get('fanart').replace('&#39;', '\''), 
+                    data.get('banner').replace('&#39;', '\''), 
                     data.get('url'), 
-                    data.get('description').replace('\'', '\'\''), 
-                    data.get('shortdescription').replace('\'', '\'\''), 
+                    data.get('description'), 
+                    data.get('shortdescription'), 
                     data.get('year'), 
                     data.get('ltype'), 
                     data.get('duration', 0), 
                     0, 
                     0, 
-                    0)))
+                    0))
             self._dbcon.commit()
             return True
         return False
@@ -192,7 +189,7 @@ class Show(model.Model):
         if len(ids) > 0:
             dbcur = self.getCursor()
             try: 
-                dbcur.execute(logger.logDebug("DELETE FROM SHOW WHERE ID in (%s)" % ','.join(ids)))
+                dbcur.execute(logger.logDebug("DELETE FROM SHOW WHERE ID in (%s)" % self._marks(ids)), ids)
                 self._dbcon.commit()
                 return True
             except: pass

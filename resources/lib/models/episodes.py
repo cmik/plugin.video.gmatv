@@ -63,8 +63,8 @@ class Episode(model.Model):
 
     def _search(self, search, sort, limit):
         dbcur = self.getCursor()
-        where = ["%s LIKE '%%%s%%'" % (str(k), str(v)) for k,v in search.items()]
-        sortBy = 'ORDER BY %s %s' % (sort[0], sort[1]) if sort != False else ''
+        where, params = self._where(search)
+        sortBy = self._sortBy(sort)
         first = 'LIMIT %d' % int(limit) if limit != False else ''
         dbcur.execute(logger.logInfo("SELECT ID, \
             TITLE, \
@@ -85,7 +85,7 @@ class Episode(model.Model):
             RATING, \
             VOTES \
             FROM EPISODE \
-            WHERE %s %s %s" % (' AND '.join(where), sortBy, first)))
+            WHERE %s %s %s" % (where, sortBy, first)), params)
         return logger.logDebug(dbcur.fetchall())
 
     def _retrieveAll(self):
@@ -132,7 +132,7 @@ class Episode(model.Model):
             RATING, \
             VOTES \
             FROM EPISODE \
-            WHERE %s IN (%s)" % (key, ','.join("'%s'" % str(v) for v in mixed))))
+            WHERE %s IN (%s)" % (self._column(key), self._marks(mixed))), list(mixed))
         return logger.logDebug(dbcur.fetchall())
 
         
@@ -144,25 +144,22 @@ class Episode(model.Model):
                 dbcur = self.getCursor()
                 dbcur.execute('PRAGMA encoding="UTF-8";')
                 self._saveUserData(data)
-                for k, e in data.items():
-                    query = "UPDATE EPISODE SET "
-                    query += "TITLE = '%s', " % data.get('name') if data.get('name', False) else "TITLE = TITLE, "
-                    query += "SHOWID = '%s', " % data.get('parentid') if data.get('parentid', False) else "SHOWID = SHOWID, "
-                    query += "SHOWNAME = '%s', " % data.get('show') if data.get('show', False) else "SHOWNAME = SHOWNAME, "
-                    query += "THUMBNAIL = '%s', " % data.get('image') if data.get('image', False) else "THUMBNAIL = THUMBNAIL, "
-                    query += "FANART = '%s', " % data.get('fanart') if data.get('fanart', False) else "FANART = FANART, "
-                    query += "EPISODENUMBER = '%s', " % data.get('episodenumber') if data.get('episodenumber', False) else "EPISODENUMBER = EPISODENUMBER, "
-                    query += "URL = '%s', " % data.get('url') if data.get('url', False) else "URL = URL, "
-                    query += "DESCRIPTION = '%s', " % data.get('description') if data.get('description', False) else "DESCRIPTION = DESCRIPTION, "
-                    query += "SHORTDESCRIPTION = '%s', " % data.get('shortdescription') if data.get('shortdescription', False) else "SHORTDESCRIPTION = SHORTDESCRIPTION, "
-                    query += "DATEAIRED = '%s', " % data.get('date') if data.get('date', False) else "DATEAIRED = DATEAIRED, "
-                    query += "YEAR = '%s', " % data.get('year') if data.get('year', False) else "YEAR = YEAR, "
-                    query += "PARENTALADVISORY = '%s', " % data.get('parentalAdvisory') if data.get('parentalAdvisory', False) else "PARENTALADVISORY = PARENTALADVISORY, "
-                    query += "TYPE = '%s', " % data.get('ltype') if data.get('ltype', False) else "TYPE = TYPE, "
-                    query += "DURATION = %d, " % data.get('duration') if data.get('duration', False) else "DURATION = DURATION, "
-                    query += "VIEWS = VIEWS, RATING = RATING, VOTES = VOTES "
-                    query += "WHERE ID = %d" % data.get('id')
-                    dbcur.execute(logger.logDebug(query))
+                self._update(dbcur, 'EPISODE', [
+                    ('TITLE', data.get('name')),
+                    ('SHOWID', data.get('parentid')),
+                    ('SHOWNAME', data.get('show')),
+                    ('THUMBNAIL', data.get('image')),
+                    ('FANART', data.get('fanart')),
+                    ('EPISODENUMBER', data.get('episodenumber')),
+                    ('URL', data.get('url')),
+                    ('DESCRIPTION', data.get('description')),
+                    ('SHORTDESCRIPTION', data.get('shortdescription')),
+                    ('DATEAIRED', data.get('date')),
+                    ('YEAR', data.get('year')),
+                    ('PARENTALADVISORY', data.get('parentalAdvisory')),
+                    ('TYPE', data.get('ltype')),
+                    ('DURATION', data.get('duration')),
+                    ], data.get('id'))
         self._dbcon.commit()
         return True
         
@@ -172,19 +169,19 @@ class Episode(model.Model):
             self.checkIfTableExists()
             dbcur = self.getCursor()
             dbcur.execute('PRAGMA encoding="UTF-8";')
-            dbcur.execute(logger.logDebug("DELETE FROM EPISODE WHERE ID in (%s)" % ','.join(ids)))
+            dbcur.execute(logger.logDebug("DELETE FROM EPISODE WHERE ID in (%s)" % self._marks(ids)), ids)
             for data in mixed:
-                dbcur.execute(logger.logDebug("INSERT INTO EPISODE VALUES (%d, '%s', %d, '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', %d, %d, %d, %d)" % (
+                dbcur.execute("INSERT INTO EPISODE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (
                     data.get('id'), 
-                    data.get('title').replace('\'', '\'\''), 
+                    data.get('title'), 
                     data.get('parentid'), 
-                    data.get('show').replace('\'', '\'\''), 
-                    data.get('image').replace('&#39;', '\'\''), 
-                    data.get('fanart').replace('&#39;', '\'\''), 
+                    data.get('show'), 
+                    data.get('image').replace('&#39;', '\''), 
+                    data.get('fanart').replace('&#39;', '\''), 
                     data.get('episodenumber'), 
                     data.get('url'), 
-                    data.get('description').replace('\'', '\'\''), 
-                    data.get('shortdescription').replace('\'', '\'\''), 
+                    data.get('description'), 
+                    data.get('shortdescription'), 
                     data.get('date'), 
                     data.get('year'), 
                     data.get('parentalAdvisory'), 
@@ -192,7 +189,7 @@ class Episode(model.Model):
                     data.get('duration', 0), 
                     0, 
                     0, 
-                    0)))
+                    0))
             self._dbcon.commit()
             return True
         return False
@@ -203,7 +200,7 @@ class Episode(model.Model):
         if len(ids) > 0:
             dbcur = self.getCursor()
             try: 
-                dbcur.execute(logger.logDebug("DELETE FROM EPISODE WHERE ID in (%s)" % ','.join(ids)))
+                dbcur.execute(logger.logDebug("DELETE FROM EPISODE WHERE ID in (%s)" % self._marks(ids)), ids)
                 self._dbcon.commit()
                 return True
             except: pass
