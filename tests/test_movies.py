@@ -25,7 +25,7 @@ sys.modules['resources.lib.libraries'] = libraries
 sys.modules['resources.lib.libraries.control'] = control
 
 from resources.lib.libraries import movies  # noqa: E402
-from resources.lib.models import shows, userdata  # noqa: E402
+from resources.lib.models import episodes, shows, userdata  # noqa: E402
 
 
 def show(i, name, ltype='show'):
@@ -71,6 +71,35 @@ class MoviesTest(unittest.TestCase):
         self.assertEqual(['The Diplomat Hotel (2013)'], [s['name'] for s in db.searchByTitle('diplomat')])
         self.assertEqual(['Another', 'Delivery Boi', 'The Diplomat Hotel (2013)'], [s['name'] for s in db.searchByYear('2026')])
         self.assertEqual(3, len(db.searchByCategory('Drama')))
+
+    def test_ltype(self):
+        self.assertEqual('movie', movies.ltype(True, 1))
+        self.assertEqual('show', movies.ltype(True, 8))   # a series of the movies catalog
+        self.assertEqual('show', movies.ltype(True, 0))
+        self.assertEqual('show', movies.ltype(False, 1))  # a show with one episode so far is not a movie
+
+    def test_fix_the_types_stored_by_the_first_reloads(self):
+        d = tempfile.mkdtemp()
+        showsPath, episodesPath = os.path.join(d, 'shows.db'), os.path.join(d, 'episodes.db')
+        showDB, episodeDB = shows.Show(showsPath), episodes.Episode(episodesPath)
+        showDB._userdata = episodeDB._userdata = userdata.UserData(os.path.join(d, 'userdata.db'))
+        one, series, regular = movies.toMovieId(1), movies.toMovieId(2), 7
+        showDB.set([show(one, 'A film', 'movie'), show(series, 'A series', 'movie'), show(regular, 'A show')])
+
+        def episode(i, showId, ltype):
+            return {'id': i, 'title': 'E%d' % i, 'parentid': showId, 'show': 'S', 'image': 'i', 'fanart': 'f', 'episodenumber': i,
+                    'url': 'u', 'description': 'd', 'shortdescription': 'd', 'date': '2026-01-02', 'year': '2026',
+                    'parentalAdvisory': 'G', 'ltype': ltype, 'duration': 0, 'views': 0, 'rating': 0, 'votes': 0}
+        episodeDB.set([episode(movies.toMovieId(10), one, 'movie'), episode(movies.toMovieId(11), series, 'movie'),
+                       episode(movies.toMovieId(12), series, 'movie'), episode(13, regular, 'show')])
+        self.assertEqual(1, movies.fixTypes(showsPath, episodesPath))
+        self.assertEqual(['movie', 'show', 'show'], [showDB.get(i)[0]['ltype'] for i in (one, series, regular)])
+        self.assertEqual(['movie', 'show', 'show', 'show'], [episodeDB.get(i)[0]['ltype'] for i in (movies.toMovieId(10), movies.toMovieId(11), movies.toMovieId(12), 13)])
+        self.assertEqual(0, movies.fixTypes(showsPath, episodesPath))  # nothing left to fix
+
+    def test_fix_the_types_without_databases(self):
+        d = tempfile.mkdtemp()
+        self.assertEqual(0, movies.fixTypes(os.path.join(d, 'a.db'), os.path.join(d, 'b.db')))
 
 
 if __name__ == '__main__':
