@@ -49,16 +49,12 @@ class navigator:
 
         # if control.setting('displayMyList') == 'true':
         #     self.addDirectoryItem(control.lang(30200), '/', config.MYLIST, control.addonFolderIcon(control.lang(30200)), isFolder=True, **self.formatMenu())
-        
-        # if control.setting('displayWebsiteSections') == 'true':
-        #     self.addDirectoryItem(control.lang(30201), '/', config.CATEGORIES, control.addonFolderIcon(control.lang(30201)), isFolder=True, **self.formatMenu())
-        # else:
-        #     self.showCategories()
+
+        # the shelves of the GMA Play home page are in a sub menu: about 17 of them would fill this one
         if control.setting('displayWebsiteSections') == 'true':
-            control.showNotification(control.lang(37020), control.lang(30008))
-            sections = gmatv.getWebsiteHomeSections()
-            for s in sections:
-                self.addDirectoryItem(s['name'].title(), str(s['id']), config.SECTIONCONTENT, control.addonFolderIcon(s['name'].title()), isFolder=True, **self.formatMenu())
+            self.addDirectoryItem(control.lang(30202), '/', config.HOMESECTIONS, control.addonFolderIcon(control.lang(30202)), isFolder=True, **self.formatMenu())
+
+        self.addDirectoryItem(control.lang(30201), '/', config.CATEGORIES, control.addonFolderIcon(control.lang(30201)), isFolder=True, **self.formatMenu())
             
         if control.setting('exportToLibrary') == 'true':
             self.addDirectoryItem(control.lang(36023), '/', config.EXPORTEDSHOWS, control.addonFolderIcon(control.lang(36023)), isFolder=True, **self.formatMenu())
@@ -97,9 +93,12 @@ class navigator:
         categories = gmatv.getCategories()
         for c in categories:
             self.addDirectoryItem(c.get('name'), str(c.get('id')), config.SUBCATEGORIES, control.addonFolderIcon(c.get('name')), isFolder=True, **self.formatMenu())
-            
-        if control.setting('displayWebsiteSections') == 'true':
-            self.endDirectory()
+        self.endDirectory()
+
+    def showHomeSections(self):
+        for s in gmatv.getWebsiteHomeSections():
+            self.addDirectoryItem(s['name'].title(), str(s['id']), config.SECTIONCONTENT, control.addonFolderIcon(s['name'].title()), isFolder=True, **self.formatMenu())
+        self.endDirectory()
           
     def showSubCategories(self, categoryId):
         subCategories = gmatv.getSubCategories(categoryId)
@@ -108,7 +107,7 @@ class navigator:
         self.endDirectory()
        
     def showSubCategoryShows(self, subCategoryId):
-        shows = gmatv.getShows(subCategoryId)
+        shows = gmatv.getShows(subCategoryId, useCache=True)
         if len(shows) > 0:
             self.displayShows(shows)
         else:
@@ -159,12 +158,9 @@ class navigator:
         elif category == 'episode':
             self.addDirectoryItem(control.lang(30208), '/', config.EXECUTESEARCH, control.addonFolderIcon(control.lang(30208)), isFolder=True, query='category=%s&type=%s' % (category, 'title'), **self.formatMenu())
             self.addDirectoryItem(control.lang(30211), '/', config.EXECUTESEARCH, control.addonFolderIcon(control.lang(30211)), isFolder=True, query='category=%s&type=%s' % (category, 'date'), **self.formatMenu())
-        elif category == 'celebrity':
-            control.showNotification(control.lang(37026), control.lang(30001))
         else:
              self.addDirectoryItem(control.lang(30205), '/', config.SEARCHMENU, control.addonFolderIcon(control.lang(30205)), isFolder=True, query='category=%s' % 'movieshow', **self.formatMenu())
              self.addDirectoryItem(control.lang(30206), '/', config.SEARCHMENU, control.addonFolderIcon(control.lang(30206)), isFolder=True, query='category=%s' % 'episode', **self.formatMenu())
-             self.addDirectoryItem(control.lang(30207), '/', config.SEARCHMENU, control.addonFolderIcon(control.lang(30207)), isFolder=True, query='category=%s' % 'celebrity', **self.formatMenu())
         self.endDirectory()
 
     def executeSearch(self, category, type):
