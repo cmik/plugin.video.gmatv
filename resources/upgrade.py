@@ -29,8 +29,8 @@ def upgradeDB():
     tools.checkInstallDB()
 
     # the first catalog reloads stored as movies the titles of the movies catalog that have several episodes
-    from resources.lib.libraries import movies
-    logger.logNotice('Movie types fixed: %d' % movies.fixTypes(control.showsFile, control.episodesFile))
+    from resources.lib.libraries import origins
+    logger.logNotice('Movie types fixed: %d' % origins.fixTypes(control.showsFile, control.episodesFile))
 
 def upgradeSettings():
     return True
