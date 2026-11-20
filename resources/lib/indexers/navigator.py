@@ -158,12 +158,9 @@ class navigator:
         elif category == 'episode':
             self.addDirectoryItem(control.lang(30208), '/', config.EXECUTESEARCH, control.addonFolderIcon(control.lang(30208)), isFolder=True, query='category=%s&type=%s' % (category, 'title'), **self.formatMenu())
             self.addDirectoryItem(control.lang(30211), '/', config.EXECUTESEARCH, control.addonFolderIcon(control.lang(30211)), isFolder=True, query='category=%s&type=%s' % (category, 'date'), **self.formatMenu())
-        elif category == 'celebrity':
-            control.showNotification(control.lang(37026), control.lang(30001))
         else:
              self.addDirectoryItem(control.lang(30205), '/', config.SEARCHMENU, control.addonFolderIcon(control.lang(30205)), isFolder=True, query='category=%s' % 'movieshow', **self.formatMenu())
              self.addDirectoryItem(control.lang(30206), '/', config.SEARCHMENU, control.addonFolderIcon(control.lang(30206)), isFolder=True, query='category=%s' % 'episode', **self.formatMenu())
-             self.addDirectoryItem(control.lang(30207), '/', config.SEARCHMENU, control.addonFolderIcon(control.lang(30207)), isFolder=True, query='category=%s' % 'celebrity', **self.formatMenu())
         self.endDirectory()
 
     def executeSearch(self, category, type):
