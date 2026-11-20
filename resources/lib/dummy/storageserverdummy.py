@@ -23,6 +23,9 @@ class StorageServer:
     def getMulti(self, name, items):
         return ""
 
+    def cacheClean(self, force=False):
+        return True
+
     def lock(self, name):
         return False
 
