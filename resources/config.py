@@ -36,9 +36,26 @@ uri = {
     'castLowRes' : '/entertainment/tv/castinformation/320_240_%s',
     'cast' : '/entertainment/tv/castinformation/640_480_%s',
 }
-# the movies of GMA Play are a separate catalog (origin 'fulleps', own endpoints): their ids and the ids of their
-# episodes are shifted by this offset in the databases, so that they can't collide with the ids of the shows
-movieIdOffset = 1000000000
+# Besides the shows (origin 'ent'), GMA Play has catalogs with their own ids, services and image folder:
+# the movies ('fulleps') and the public affairs shows ('pa'). Their ids and the ids of their episodes can collide
+# with the ones of the shows (2473 is both a show and a movie), so they are shifted by an offset in the databases
+# (the services are called with the real id).
+catalogs = {
+    'fulleps' : {
+        'offset' : 1000000000,
+        'imageSection' : 'fulleps',
+        'details' : '/entertainment/tv/fulleps/%s/show_details.gz',
+        'nbPages' : '/entertainment/tracker/list_tv_%s_fulleps_videos.gz',
+        'episodes' : '/entertainment/listing/tv/fulleps/%s/full_episode/%s.gz'
+        },
+    'pa' : {
+        'offset' : 2000000000,
+        'imageSection' : 'gno',
+        'details' : '/entertainment/tv/pa/%s/show_details.gz',
+        'nbPages' : '/entertainment/tracker/pa/list_tv_%s_full_episode.gz',
+        'episodes' : '/entertainment/listing/tv/pa/%s/full_episode/%s.gz'
+        }
+    }
 services = {
     'sectionList' : '/entertainment/fulleps/section_list.gz',
     'sectionPage' : '/entertainment/fulleps/sections/%s.gz',
@@ -50,10 +67,7 @@ services = {
     'episodesPerPage' : '/entertainment/listing/tv/%s/episodes/%s.gz',
     'fullEpisodesPerPage' : '/entertainment/listing/tv/%s/full_episode/%s.gz',
     'episodeDetails' : '/entertainment/listing/tv/%s/full_episode/%s.gz',
-    'showCasts' : '/entertainment/tv/%s/listing_tv_cast.gz',
-    'movieDetails' : '/entertainment/tv/fulleps/%s/show_details.gz',
-    'movieNbEpisodePages' : '/entertainment/tracker/list_tv_%s_fulleps_videos.gz',
-    'movieEpisodesPerPage' : '/entertainment/listing/tv/fulleps/%s/full_episode/%s.gz'
+    'showCasts' : '/entertainment/tv/%s/listing_tv_cast.gz'
 }
 
 # User-agent

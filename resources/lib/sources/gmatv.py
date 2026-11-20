@@ -13,7 +13,7 @@ from urllib import request as libRequest
 from urllib.parse import urlencode,quote,quote_plus
 from operator import itemgetter
 from resources import config
-from resources.lib.libraries import control,cache,tools,movies
+from resources.lib.libraries import control,cache,tools,origins
 from resources.lib.models import episodes,shows,library,showcast
 
 bs = control.soup
@@ -447,18 +447,15 @@ def extractWebsiteSectionShowData(show):
     logger.logInfo('called function')
     
     showId = show.get('id', '')
-    isMovie = movies.isMovie(show)
-    if isMovie: showId = movies.toMovieId(showId)
+    origin = origins.originOfShow(show)
+    if origin: showId = origins.toStoredId(origin, showId)
     showName = unicodetoascii(show.get('show_title', ''))
-    image = generateImageURL(show.get('primary_poster')[0].get('image_name'), section=movies.IMAGE_SECTION if isMovie else 'entertainment')
+    image = generateImageURL(imageName(show.get('primary_poster')), section=origins.imageSection(origin))
     description = unicodetoascii(show.get('synopsis', ''))
     year = show.get('airing_year', '')
     if year == '':
-        try:
-            datePublished = datetime.datetime.strptime(show.get('air_date_from'), '%m/%d/%Y')
-        except TypeError:
-            datePublished = datetime.datetime(*(time.strptime(show.get('air_date_from'), '%m/%d/%Y')[0:6]))
-        year = datePublished.strftime('%Y')
+        datePublished = parseDate(show.get('air_date_from'), ('%m/%d/%Y',))
+        year = datePublished.strftime('%Y') if datePublished else ''
     genre = show.get('keywords', '')
     
     res = showDB.get(int(showId))
@@ -490,7 +487,14 @@ def episodeThumbnail(episode):
     photo = (episode.get('photo') or {}).get('url')
     return generateImageURL(photo, type='episode') if photo else ''
 
+def imageName(images):
+    """The name of the first image of a list of the website ([{'image_name': ...}]), '' when there is none"""
+    return (images[0].get('image_name') or '') if isinstance(images, list) and len(images) > 0 else ''
+
 def generateImageURL(image, type='poster', res='high', section='entertainment'):
+    if not image:
+        return ''
+
     img = 'image' 
     if type in 'poster':
         img = 'image' 
@@ -523,29 +527,28 @@ def getShow(showId, parentId=-1, year=''):
     logger.logInfo('called function with param (%s, %s, %s)' % (showId, str(parentId), year))
     data = {}
     import html
-    isMovie = movies.isMovieId(showId)
-    imageSection = movies.IMAGE_SECTION if isMovie else 'entertainment'
-    # the movies have their own service and their ids are shifted in the databases
-    showDetails = callJsonApi(config.services.get('movieDetails' if isMovie else 'showDetails') % movies.toApiId(showId), useCache=False)
+    origin = origins.originOfId(showId)
+    imageSection = origins.imageSection(origin)
+    # the movies and the public affairs shows have their own services and their ids are shifted in the databases
+    showDetails = callJsonApi(origins.service(origin, 'details', config.services.get('showDetails')) % origins.toApiId(showId), useCache=False)
     if showDetails.get('showabout', False) != False:
         showData = showDetails.get('showabout')[0]
         res = showDB.get(int(showId))
         show = res[0] if len(res) == 1 else {}
 
         if year == '':
-            try:
-                datePublished = datetime.datetime.strptime(showData.get('air_date_from'), '%m/%d/%Y')
-            except TypeError:
-                datePublished = datetime.datetime(*(time.strptime(showData.get('air_date_from'), '%m/%d/%Y')[0:6]))
-            year = datePublished.strftime('%Y')
+            datePublished = parseDate(showData.get('air_date_from'), ('%m/%d/%Y',))
+            year = datePublished.strftime('%Y') if datePublished else ''
 
         if parentId == -1: parentId = show.get('parentid', parentId)
         if year == '': year = show.get('year', year)
         
-        url = config.websiteUrl + config.uri.get('base') + showData.get('url')
-        logo = generateImageURL(showData.get('primary_poster')[0].get('image_name'), type='poster', section=imageSection)
-        image = generateImageURL(showData.get('secondary_poster')[0].get('image_name'), type='poster', section=imageSection)
-        fanart = generateImageURL(showData.get('main_tcard')[0].get('image_name'), type='banner', section=imageSection)
+        url = config.websiteUrl + config.uri.get('base') + (showData.get('url') or '')
+        # an image may be missing (empty name): the poster replaces it
+        poster = imageName(showData.get('primary_poster'))
+        logo = generateImageURL(poster, type='poster', section=imageSection)
+        image = generateImageURL(imageName(showData.get('secondary_poster')) or poster, type='poster', section=imageSection)
+        fanart = generateImageURL(imageName(showData.get('main_tcard')) or poster, type='banner', section=imageSection)
         banner = fanart
             
         name = showData.get('show_title')
@@ -593,7 +596,7 @@ def getShow(showId, parentId=-1, year=''):
             'nbEpisodes' : episodeList.get('nbEpisodes', 0),
             'episodes' : episodeList.get('episodes', []),
             'casts' : actors,
-            'ltype' : movies.ltype(isMovie, episodeList.get('nbEpisodes', 0)),
+            'ltype' : origins.ltype(origin, episodeList.get('nbEpisodes', 0)),
             'duration' : 0,
             'views' : 0,
             'rating' : 0,
@@ -606,6 +609,10 @@ def getShow(showId, parentId=-1, year=''):
         logger.logWarning('Error on show %s: %s' % (showId, 'no data found'))
     return data
 
+def hasEpisodes(pageData):
+    """True for the answer of an episodes service with a list of episodes (the public affairs one has no 'status')"""
+    return isinstance(pageData, dict) and pageData.get('status', '200') == '200' and isinstance(pageData.get('data'), list)
+
 def getShowEpisodes(showId):
     logger.logInfo('called function with param (%s)' % (showId))
     data = {
@@ -614,10 +621,10 @@ def getShowEpisodes(showId):
         'fromBase': False
         }
     episodesList = []
-    isMovie = movies.isMovieId(showId)
-    apiId = movies.toApiId(showId)
-    nbPagesService = config.services.get('movieNbEpisodePages' if isMovie else 'showNbFullEpisodePages')
-    episodesService = config.services.get('movieEpisodesPerPage' if isMovie else 'fullEpisodesPerPage')
+    origin = origins.originOfId(showId)
+    apiId = origins.toApiId(showId)
+    nbPagesService = origins.service(origin, 'nbPages', config.services.get('showNbFullEpisodePages'))
+    episodesService = origins.service(origin, 'episodes', config.services.get('fullEpisodesPerPage'))
     nbEpisodePages = callJsonApi(nbPagesService % apiId, useCache = False)
     nbPages = 0
     fromBase = False
@@ -626,11 +633,11 @@ def getShowEpisodes(showId):
             nbPages = int(nbEpisodePages.get('count'))
             for page in range(1, nbPages+1, 1):
                 pageData = callJsonApi(episodesService % (apiId, page), useCache = False)
-                if 'status' in pageData and pageData.get('status') == '200':
+                if hasEpisodes(pageData):
                     episodesList += pageData.get('data')
         else:
             pageData = callJsonApi(episodesService % (apiId, 'all'), useCache = False)
-            if 'status' in pageData and pageData.get('status') == '200':
+            if hasEpisodes(pageData):
                 episodesList += pageData.get('data')
             else:
                 episodesList = episodeDB.getByShow(showId, 500)
@@ -642,16 +649,14 @@ def getShowEpisodes(showId):
 
     if len(episodesList) > 0 and not fromBase:
         for episode in episodesList:
-            epNb = re.compile('Episode +([0-9]+)', re.IGNORECASE).search(episode.get('title'))
-            try:
-                datePublished = datetime.datetime.strptime(episode.get('publish_date'), '%B %d, %Y')
-            except TypeError:
-                datePublished = datetime.datetime(*(time.strptime(episode.get('publish_date'), '%B %d, %Y')[0:6]))
+            epNb = re.compile('Episode +([0-9]+)', re.IGNORECASE).search(cleanTextFromHTML(episode.get('title')))
+            # 'November 18, 2026' (shows), 'Nov 14, 2026' (public affairs), else the timestamp
+            datePublished = parseDate(episode.get('publish_date'), ('%B %d, %Y', '%b %d, %Y')) or parseDate(episode.get('publish_timestamp'), ('%Y-%m-%d %H:%M:%S',)) or datetime.datetime.now()
             year = datePublished.strftime('%Y')
             description = cleanTextFromHTML(episode.get('lead'))
             data['episodes'].append({
-                'id' : movies.toMovieId(episode.get('id')) if isMovie else episode.get('id'),
-                'title' : episode.get('title'),
+                'id' : origins.toStoredId(origin, episode.get('id')) if origin else episode.get('id'),
+                'title' : cleanTextFromHTML(episode.get('title')),
                 'episodenumber' : int(epNb.group(1)) if epNb != None  else 0,
                 'description' : description,
                 'shortdescription' : description,
@@ -1068,6 +1073,17 @@ def callJsonApi(path, params={}, headers=[('X-Requested-With', 'XMLHttpRequest')
     except:
         pass
     return data
+
+def parseDate(text, formats):
+    """The date of `text` in the first of the `formats` that fits, None when there is none (or no text)"""
+    if not text:
+        return None
+    for fmt in formats:
+        try:
+            return datetime.datetime(*(time.strptime(text, fmt)[0:6]))
+        except (TypeError, ValueError):
+            continue
+    return None
 
 def cleanTextFromHTML(text):
     import html
