@@ -10,6 +10,8 @@
     are called with the real id.
 '''
 
+import sqlite3
+
 from resources import config
 
 # origin of the shows that are movies
@@ -40,3 +42,30 @@ def toMovieId(apiId):
 def toApiId(itemId):
     """The id to give to the website services"""
     return int(itemId) - config.movieIdOffset if isMovieId(itemId) else int(itemId)
+
+
+def ltype(isMovie, nbEpisodes):
+    """'movie' only for a movie with a single episode: the catalog of the movies also holds series
+    (several episodes), which are listed like the other shows"""
+    return 'movie' if isMovie and nbEpisodes == 1 else 'show'
+
+
+def fixTypes(showsPath, episodesPath):
+    """Give the type 'show' to the titles of the movies catalog stored as movies by the first catalog reloads
+    although they have several episodes (and to their episodes). Returns the number of shows changed."""
+    changed = 0
+    try:
+        con = sqlite3.connect(showsPath)
+        try:
+            con.execute('ATTACH ? AS e', (episodesPath,))
+            several = 'SELECT SHOWID FROM e.EPISODE WHERE SHOWID >= ? GROUP BY SHOWID HAVING COUNT(*) > 1'
+            offset = config.movieIdOffset
+            con.execute("UPDATE e.EPISODE SET TYPE = 'show' WHERE TYPE = 'movie' AND SHOWID IN (%s)" % several, (offset,))
+            changed = con.execute("UPDATE SHOW SET TYPE = 'show' WHERE ID >= ? AND TYPE = 'movie' AND ID IN (%s)" % several, (offset, offset)).rowcount
+            con.commit()
+        finally:
+            con.close()
+    except sqlite3.Error:
+        # no table yet (new installation): nothing to fix
+        return 0
+    return changed

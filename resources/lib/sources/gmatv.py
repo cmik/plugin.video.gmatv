@@ -467,7 +467,7 @@ def extractWebsiteSectionShowData(show):
     else:
         return {
             'type' : 'show',
-            'ltype' : 'movie' if isMovie else 'show',
+            'ltype' : 'show',
             'id' : int(showId),
             'parentid' : -1,
             'parentname' : genre,
@@ -593,7 +593,7 @@ def getShow(showId, parentId=-1, year=''):
             'nbEpisodes' : episodeList.get('nbEpisodes', 0),
             'episodes' : episodeList.get('episodes', []),
             'casts' : actors,
-            'ltype' : 'movie' if isMovie else 'show',
+            'ltype' : movies.ltype(isMovie, episodeList.get('nbEpisodes', 0)),
             'duration' : 0,
             'views' : 0,
             'rating' : 0,
