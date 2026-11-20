@@ -56,6 +56,12 @@ class ExecutionCache:
                 res.append('')
         return res
 
+    def cacheClean(self, force=False):
+        # same as StorageServer.cacheClean: forget what is cached (the execution cache has no expiry)
+        if force:
+            self._execCache.clear()
+        return True
+
     def lock(self, name):
         return False
 
