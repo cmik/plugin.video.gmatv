@@ -6,6 +6,7 @@
 '''
 
 from resources.lib.models import model
+from resources.lib.models import userdata
 from resources.lib.libraries import control
 from datetime import datetime
 import time
@@ -47,6 +48,19 @@ class Episode(model.Model):
                 }
         return {}
     
+    def _applyUserData(self, items):
+        """The counters come from the user data database"""
+        if not items:
+            return items
+        stats = self.getUserData().getStats(userdata.EPISODE, [item['id'] for item in items if item.get('id') is not None])
+        for item in items:
+            item['views'], item['rating'], item['votes'] = stats.get(str(item.get('id')), (0, 0, 0))
+        return items
+
+    def _saveUserData(self, data):
+        """Store the user data fields (views, rating, votes) of an item"""
+        self.getUserData().setStats(userdata.EPISODE, data['id'], data.get('views'), data.get('rating'), data.get('votes'))
+
     def _search(self, search, sort, limit):
         dbcur = self.getCursor()
         where = ["%s LIKE '%%%s%%'" % (str(k), str(v)) for k,v in search.items()]
@@ -129,6 +143,7 @@ class Episode(model.Model):
             if 'id' in data:
                 dbcur = self.getCursor()
                 dbcur.execute('PRAGMA encoding="UTF-8";')
+                self._saveUserData(data)
                 for k, e in data.items():
                     query = "UPDATE EPISODE SET "
                     query += "TITLE = '%s', " % data.get('name') if data.get('name', False) else "TITLE = TITLE, "
@@ -145,9 +160,7 @@ class Episode(model.Model):
                     query += "PARENTALADVISORY = '%s', " % data.get('parentalAdvisory') if data.get('parentalAdvisory', False) else "PARENTALADVISORY = PARENTALADVISORY, "
                     query += "TYPE = '%s', " % data.get('ltype') if data.get('ltype', False) else "TYPE = TYPE, "
                     query += "DURATION = %d, " % data.get('duration') if data.get('duration', False) else "DURATION = DURATION, "
-                    query += "VIEWS = %d, " % data.get('views') if data.get('views', False) else "VIEWS = VIEWS, "
-                    query += "RATING = %d, " % data.get('rating') if data.get('rating', False) else "RATING = RATING, "
-                    query += "VOTES = %d " % data.get('votes') if data.get('votes', False) else "VOTES = VOTES "
+                    query += "VIEWS = VIEWS, RATING = RATING, VOTES = VOTES "
                     query += "WHERE ID = %d" % data.get('id')
                     dbcur.execute(logger.logDebug(query))
         self._dbcon.commit()
@@ -177,9 +190,9 @@ class Episode(model.Model):
                     data.get('parentalAdvisory'), 
                     data.get('ltype'), 
                     data.get('duration', 0), 
-                    data.get('views', 0), 
-                    data.get('rating', 0), 
-                    data.get('votes', 0))))
+                    0, 
+                    0, 
+                    0)))
             self._dbcon.commit()
             return True
         return False

@@ -13,7 +13,7 @@ from urllib import request as libRequest
 from urllib.parse import urlencode,quote,quote_plus
 from operator import itemgetter
 from resources import config
-from resources.lib.libraries import control,cache
+from resources.lib.libraries import control,cache,tools
 from resources.lib.models import episodes,shows,library,showcast
 
 bs = control.soup
@@ -97,6 +97,8 @@ def getMediaInfo(episodeId, title, thumbnail, bandwidth=False):
         episodeDB.update({'id' : episode.get('id'), 'views' : episode.get('views', 0) + 1})
         if 'id' in show:
             showDB.update({'id' : show.get('id'), 'views' : show.get('views', 0) + 1})
+        # the view history keeps what is needed to list the episode even when the catalog is replaced
+        episodeDB.getUserData().addToHistory(episode.get('id'), episode.get('parentid', ''), episode.get('title', ''), mediaInfo['data']['show'], mediaInfo['data']['image'], 'episode')
     else:
         mediaInfo['StatusMessage'] = 'Episode not found'
         mediaInfo['errorCode'] = 1
@@ -104,6 +106,8 @@ def getMediaInfo(episodeId, title, thumbnail, bandwidth=False):
 
 def resetCatalogCache():
     logger.logInfo('called function')
+    # the counters of the old versions must leave the catalog databases before they are dropped
+    tools.importUserData()
     episodeDB.drop()
     showDB.drop()
     control.showNotification(control.lang(37039), control.lang(30010))

@@ -23,6 +23,8 @@ jobs:
           python-version: '3.11' # the Python used by Kodi 21
       - name: Compile all the Python files
         run: python -W error::SyntaxWarning -W error::DeprecationWarning -m compileall -q -f default.py service.py resources
+      - name: Unit tests (models, user data)
+        run: python -m unittest discover -s tests -v
       - name: Check version, changelog, md5 and tracked files
         run: python .github/scripts/check_release.py
 
@@ -36,6 +38,8 @@ jobs:
           python-version: '3.14' # the Python of Kodi 22
       - name: Compile all the Python files
         run: python -W error::SyntaxWarning -W error::DeprecationWarning -m compileall -q -f default.py service.py resources
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
 
   addon-checker:
     name: kodi-addon-checker

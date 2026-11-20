@@ -18,20 +18,15 @@ def upgradeDB():
 
     logger.logNotice('Updating from version %s to %s' % (control.setting('lastVersion'), control.addonInfo('version')))
 
+    # the counters stored in the catalog databases must leave them before anything replaces them
+    tools.importUserData()
+
     if control.setting('lastVersion') in (''):
         # Check if installation is complete
         logger.logNotice('Checking installation')
         tools.checkInstallDB(True)
 
     tools.checkInstallDB()
-    episodeDB = episodes.Episode(control.episodesFile)
-    showDB = shows.Show(control.showsFile)
-    showViews = logger.logInfo(episodeDB.execute(['select showid, sum(views) from EPISODE where views > 0 group by showid']))
-    updateQueries = []
-    if (showViews and len(showViews) > 0):
-        for data in showViews[0]:
-            updateQueries.append('UPDATE SHOW SET VIEWS = %d WHERE ID = %d' % (int(data[1]), int(data[0])))
-        showDB.executeUpdate(logger.logInfo(updateQueries))
-        
+
 def upgradeSettings():
     return True
