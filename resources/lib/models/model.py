@@ -16,6 +16,8 @@ logger = control.logger
 class Model():
     
     _dbcon = None
+    # user data (views, rating, votes...) lives in a separate database
+    _userdata = None
 
     def __init__(self, databasePath):
         self._dbcon = database.connect(logger.logDebug(databasePath))
@@ -23,6 +25,21 @@ class Model():
         
     def _getStructure(self, data):
         return {}
+
+    def getUserData(self):
+        """The user data database (created on first use)"""
+        if self._userdata is None:
+            from resources.lib.models import userdata
+            self._userdata = userdata.UserData(control.userDataFile)
+        return self._userdata
+
+    def applyUserData(self, items):
+        """Add the user data to items that didn't come from this model's reads"""
+        return self._applyUserData(items)
+
+    def _applyUserData(self, items):
+        """Add the user data to the items read from the database (models override it)"""
+        return items
         
     def _search(self, sort, limit):
         return []
@@ -49,6 +66,7 @@ class Model():
                 results = self._search(search, sort, limit)
                 for d in results:
                     items.append(self._getStructure(d))
+                items = self._applyUserData(items)
             except (Exception) as e:
                 logger.logError('Exception: %s for data %s' % (str(e), repr(search)))
                 pass
@@ -61,6 +79,7 @@ class Model():
             results = self._retrieveAll()
             for d in results:
                 items.append(self._getStructure(d))
+            items = self._applyUserData(items)
         except (Exception) as e:
             logger.logError('Exception: %s' % str(e))
             pass
@@ -74,6 +93,7 @@ class Model():
             results = self._retrieve(search, key)
             for d in results:
                 items.append(self._getStructure(d))
+            items = self._applyUserData(items)
         except (Exception) as e:
             logger.logError('Exception: %s for data %s' % (str(e), repr(mixed)))
             pass

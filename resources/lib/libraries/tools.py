@@ -11,6 +11,15 @@ from resources.lib.libraries import control
 
 logger = control.logger
 
+def importUserData():
+    """Move the counters stored in the catalog databases by the previous versions to the user data database (done once)"""
+    try:
+        from resources.lib.models import userdata
+        return userdata.UserData(control.userDataFile).importLegacy(control.showsFile, control.episodesFile)
+    except Exception as e:
+        logger.logError('Can\'t import the user data: %s' % str(e))
+        return 0
+
 def importShowDB():
     fileSource = logger.logInfo(control.browse(1, 'Select your shows DB file', 'files', '.db'))
     if (fileSource != ''):
@@ -25,6 +34,7 @@ def importEpisodeDB():
 
 def importDBFiles():
     status = True
+    importUserData()
     try:
         dBImportURL = control.setting('databaseImportURL')
         
