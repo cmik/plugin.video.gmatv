@@ -36,9 +36,9 @@ uri = {
     'castLowRes' : '/entertainment/tv/castinformation/320_240_%s',
     'cast' : '/entertainment/tv/castinformation/640_480_%s',
 }
-# sections of GMA Play the add-on can not read yet: the movies have their own id space (origin 'fulleps',
-# tv/fulleps/<id>/... endpoints, ids that collide with the shows)
-unsupportedSections = ('movies',)
+# the movies of GMA Play are a separate catalog (origin 'fulleps', own endpoints): their ids and the ids of their
+# episodes are shifted by this offset in the databases, so that they can't collide with the ids of the shows
+movieIdOffset = 1000000000
 services = {
     'sectionList' : '/entertainment/fulleps/section_list.gz',
     'sectionPage' : '/entertainment/fulleps/sections/%s.gz',
@@ -50,7 +50,10 @@ services = {
     'episodesPerPage' : '/entertainment/listing/tv/%s/episodes/%s.gz',
     'fullEpisodesPerPage' : '/entertainment/listing/tv/%s/full_episode/%s.gz',
     'episodeDetails' : '/entertainment/listing/tv/%s/full_episode/%s.gz',
-    'showCasts' : '/entertainment/tv/%s/listing_tv_cast.gz'
+    'showCasts' : '/entertainment/tv/%s/listing_tv_cast.gz',
+    'movieDetails' : '/entertainment/tv/fulleps/%s/show_details.gz',
+    'movieNbEpisodePages' : '/entertainment/tracker/list_tv_%s_fulleps_videos.gz',
+    'movieEpisodesPerPage' : '/entertainment/listing/tv/fulleps/%s/full_episode/%s.gz'
 }
 
 # User-agent

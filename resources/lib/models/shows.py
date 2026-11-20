@@ -208,13 +208,13 @@ class Show(model.Model):
             return False
 
     def searchByTitle(self, title, limit=100):
-        return self.search({'TITLE' : title}, ['NAME', 'ASC'], limit)
+        return self.search({'TITLE' : title}, ['TITLE', 'ASC'], limit)
 
     def searchByCategory(self, category, limit=100):
-        return self.search({'PARENTNAME' : category}, ['NAME', 'ASC'], limit)
+        return self.search({'PARENTNAME' : category}, ['TITLE', 'ASC'], limit)
 
     def searchByYear(self, year, limit=100):
-        return self.search({'YEAR' : year}, ['NAME', 'ASC'], limit)
+        return self.search({'YEAR' : year}, ['TITLE', 'ASC'], limit)
 
     def checkIfTableExists(self):
         dbcur = self.getCursor()

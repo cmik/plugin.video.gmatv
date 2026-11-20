@@ -13,7 +13,7 @@ from urllib import request as libRequest
 from urllib.parse import urlencode,quote,quote_plus
 from operator import itemgetter
 from resources import config
-from resources.lib.libraries import control,cache,tools
+from resources.lib.libraries import control,cache,tools,movies
 from resources.lib.models import episodes,shows,library,showcast
 
 bs = control.soup
@@ -98,7 +98,7 @@ def getMediaInfo(episodeId, title, thumbnail, bandwidth=False):
         if 'id' in show:
             showDB.update({'id' : show.get('id'), 'views' : show.get('views', 0) + 1})
         # the view history keeps what is needed to list the episode even when the catalog is replaced
-        episodeDB.getUserData().addToHistory(episode.get('id'), episode.get('parentid', ''), episode.get('title', ''), mediaInfo['data']['show'], mediaInfo['data']['image'], 'episode')
+        episodeDB.getUserData().addToHistory(episode.get('id'), episode.get('parentid', ''), episode.get('title', ''), mediaInfo['data']['show'], mediaInfo['data']['image'], episode.get('ltype') or 'episode')
     else:
         mediaInfo['StatusMessage'] = 'Episode not found'
         mediaInfo['errorCode'] = 1
@@ -208,9 +208,6 @@ def getSiteMenu():
     for section in sectionList.get('data', []) if isinstance(sectionList, dict) else []:
         sectionId = section.get('section_id')
         if not sectionId:
-            continue
-        # TODO movies: their shows are in another id space (origin 'fulleps'), not supported yet
-        if section.get('section_code') in config.unsupportedSections:
             continue
         sectionPage = callJsonApi(config.services.get('sectionPage') % sectionId)
         subCategories = []
@@ -450,8 +447,10 @@ def extractWebsiteSectionShowData(show):
     logger.logInfo('called function')
     
     showId = show.get('id', '')
+    isMovie = movies.isMovie(show)
+    if isMovie: showId = movies.toMovieId(showId)
     showName = unicodetoascii(show.get('show_title', ''))
-    image = generateImageURL(show.get('primary_poster')[0].get('image_name'))
+    image = generateImageURL(show.get('primary_poster')[0].get('image_name'), section=movies.IMAGE_SECTION if isMovie else 'entertainment')
     description = unicodetoascii(show.get('synopsis', ''))
     year = show.get('airing_year', '')
     if year == '':
@@ -468,7 +467,7 @@ def extractWebsiteSectionShowData(show):
     else:
         return {
             'type' : 'show',
-            'ltype' : 'show',
+            'ltype' : 'movie' if isMovie else 'show',
             'id' : int(showId),
             'parentid' : -1,
             'parentname' : genre,
@@ -491,7 +490,7 @@ def episodeThumbnail(episode):
     photo = (episode.get('photo') or {}).get('url')
     return generateImageURL(photo, type='episode') if photo else ''
 
-def generateImageURL(image, type='poster', res='high'):
+def generateImageURL(image, type='poster', res='high', section='entertainment'):
     img = 'image' 
     if type in 'poster':
         img = 'image' 
@@ -501,7 +500,11 @@ def generateImageURL(image, type='poster', res='high'):
         img = 'cast' 
     elif type == 'episode':
         img = 'episode'
-    return config.websiteCDNUrl + config.uri.get(img) % image
+    path = config.uri.get(img) % image
+    # the images of the movies are in their own folder
+    if section != 'entertainment':
+        path = path.replace('/entertainment/', '/%s/' % section, 1)
+    return config.websiteCDNUrl + path
 
 def getShows(subCategoryId, page = 1):
     logger.logInfo('called function with param (%s, %s)' % (subCategoryId, page))
@@ -520,10 +523,13 @@ def getShow(showId, parentId=-1, year=''):
     logger.logInfo('called function with param (%s, %s, %s)' % (showId, str(parentId), year))
     data = {}
     import html
-    showDetails = callJsonApi(config.services.get('showDetails') % showId, useCache=False)
+    isMovie = movies.isMovieId(showId)
+    imageSection = movies.IMAGE_SECTION if isMovie else 'entertainment'
+    # the movies have their own service and their ids are shifted in the databases
+    showDetails = callJsonApi(config.services.get('movieDetails' if isMovie else 'showDetails') % movies.toApiId(showId), useCache=False)
     if showDetails.get('showabout', False) != False:
         showData = showDetails.get('showabout')[0]
-        res = showDB.get(int(showData.get('show_id')))
+        res = showDB.get(int(showId))
         show = res[0] if len(res) == 1 else {}
 
         if year == '':
@@ -537,9 +543,9 @@ def getShow(showId, parentId=-1, year=''):
         if year == '': year = show.get('year', year)
         
         url = config.websiteUrl + config.uri.get('base') + showData.get('url')
-        logo = generateImageURL(showData.get('primary_poster')[0].get('image_name'), type='poster')
-        image = generateImageURL(showData.get('secondary_poster')[0].get('image_name'), type='poster')
-        fanart = generateImageURL(showData.get('main_tcard')[0].get('image_name'), type='banner')
+        logo = generateImageURL(showData.get('primary_poster')[0].get('image_name'), type='poster', section=imageSection)
+        image = generateImageURL(showData.get('secondary_poster')[0].get('image_name'), type='poster', section=imageSection)
+        fanart = generateImageURL(showData.get('main_tcard')[0].get('image_name'), type='banner', section=imageSection)
         banner = fanart
             
         name = showData.get('show_title')
@@ -587,7 +593,7 @@ def getShow(showId, parentId=-1, year=''):
             'nbEpisodes' : episodeList.get('nbEpisodes', 0),
             'episodes' : episodeList.get('episodes', []),
             'casts' : actors,
-            'ltype' : 'show',
+            'ltype' : 'movie' if isMovie else 'show',
             'duration' : 0,
             'views' : 0,
             'rating' : 0,
@@ -608,18 +614,22 @@ def getShowEpisodes(showId):
         'fromBase': False
         }
     episodesList = []
-    nbEpisodePages = callJsonApi(config.services.get('showNbFullEpisodePages') % showId, useCache = False)
+    isMovie = movies.isMovieId(showId)
+    apiId = movies.toApiId(showId)
+    nbPagesService = config.services.get('movieNbEpisodePages' if isMovie else 'showNbFullEpisodePages')
+    episodesService = config.services.get('movieEpisodesPerPage' if isMovie else 'fullEpisodesPerPage')
+    nbEpisodePages = callJsonApi(nbPagesService % apiId, useCache = False)
     nbPages = 0
     fromBase = False
     if 'count' in nbEpisodePages:
         if nbEpisodePages.get('count') != 'all':
             nbPages = int(nbEpisodePages.get('count'))
             for page in range(1, nbPages+1, 1):
-                pageData = callJsonApi(config.services.get('fullEpisodesPerPage') % (showId, page), useCache = False)
+                pageData = callJsonApi(episodesService % (apiId, page), useCache = False)
                 if 'status' in pageData and pageData.get('status') == '200':
                     episodesList += pageData.get('data')
         else:
-            pageData = callJsonApi(config.services.get('fullEpisodesPerPage') % (showId, 'all'), useCache = False)
+            pageData = callJsonApi(episodesService % (apiId, 'all'), useCache = False)
             if 'status' in pageData and pageData.get('status') == '200':
                 episodesList += pageData.get('data')
             else:
@@ -640,7 +650,7 @@ def getShowEpisodes(showId):
             year = datePublished.strftime('%Y')
             description = cleanTextFromHTML(episode.get('lead'))
             data['episodes'].append({
-                'id' : episode.get('id'),
+                'id' : movies.toMovieId(episode.get('id')) if isMovie else episode.get('id'),
                 'title' : episode.get('title'),
                 'episodenumber' : int(epNb.group(1)) if epNb != None  else 0,
                 'description' : description,
@@ -663,113 +673,61 @@ def getEpisodesPerPage(showId, parentId, year, page=1, itemsPerPage=8, order='de
     if showDetails:
         nbEpisodes = showDetails.get('nbEpisodes', 0)
         
-        # if movie or special
-        if nbEpisodes == 1 and showDetails.get('ltype', '') in ('movie', 'episode'):
-            html = callServiceApi(config.uri.get('showDetails') % showId, useCache=False)
-            episodeId = int(re.compile('var dfp_e = "(.+)";', re.IGNORECASE).search(html).group(1))
-            episodeData = json.loads(re.compile(r'var ldj = (\{.+\})', re.IGNORECASE).search(html).group(1))
+        episodes = sorted(showDetails.get('episodes'), key=lambda item: item['episodenumber'], reverse=True if order == 'desc' else False)
 
+        # Calculating episode index according to page and items per page
+        episodeIndex = (page * 1 - 1) * itemsPerPage
+        for index in range(episodeIndex, episodeIndex+itemsPerPage, 1):
+            if index >= nbEpisodes:
+                break
+
+            logger.logDebug('Episode index : %s' % index)
+            episodeData = episodes[index]
+            url = episodeData.get('url')
+            episodeId = int(episodeData.get('id'))
             res = episodeDB.get(episodeId)
             if len(res) == 1:
                 e = res[0]
+                # Update title value with episode number
                 if episodeData:
-                    e['title'] = episodeData.get('name')
+                    e['title'] = episodeData.get('title')
                     e['episodenumber'] = episodeData.get('episodenumber')
                     e['showObj'] = showDetails
+                    # the thumbnail stored by an older version may no longer exist
+                    if episodeData.get('img'): e['image'] = episodeData.get('img')
                 data.append(e)
             else:
-                try:
-                    datePublished = datetime.datetime.strptime(episodeData.get('datePublished'), '%Y-%m-%d')
-                except TypeError:
-                    datePublished = datetime.datetime(*(time.strptime(episodeData.get('datePublished'), '%Y-%m-%d')[0:6]))
-        
-                type = 'episode' if episodeData.get('@type' ,'episode').lower() not in ('episode','movie') else episodeData.get('@type' ,'episode').lower()
-                edata = {
+                image = episodeData.get('img')
+                title = episodeData.get('title')
+                dateAired = episodeData.get('aired')
+                showTitle = showDetails.get('name')
+                fanart = showDetails.get('fanart')
+                year = dateAired.split('-').pop(0)
+                description = episodeData.get('description')
+                shortDescription = description
+                episodeNumber = episodeData.get('episodenumber')
+                
+                e = {
                     'id' : episodeId,
-                    'title' : episodeData.get('name'),
-                    'show' : showDetails.get('name', episodeData.get('name')),
-                    'image' : episodeData.get('thumbnailUrl',  episodeData.get('image')),
-                    'episodenumber' : 1,
-                    'description' : episodeData.get('description'),
-                    'shortdescription' : episodeData.get('description'),
-                    'dateaired' : datePublished.strftime('%b %d, %Y'),
-                    'date' : datePublished.strftime('%Y-%m-%d'),
-                    'year' : datePublished.strftime('%Y'),
-                    'fanart' : showDetails.get('fanart'),
+                    'title' : title,
+                    'parentid' : int(showId),
+                    'show' : showTitle,
+                    'image' : image,
+                    'fanart' : fanart,
+                    'episodenumber' : episodeNumber,
+                    'url' : url,
+                    'description' : description,
+                    'shortdescription' : shortDescription,
+                    'dateaired' : dateAired,
+                    'date' : dateAired,
+                    'year' : year,
+                    'parentalAdvisory' : '',
                     'showObj' : showDetails,
-                    'ltype' : type,
-                    'duration' : 0,
-                    'views' : 0,
-                    'rating' : episodeData.get('aggregateRating' , {}).get('ratingValue', 0),
-                    'votes' : episodeData.get('aggregateRating' , {}).get('reviewCount', 0),
+                    'ltype' : showDetails.get('ltype'),
                     'type' : 'episode'
                     }
-                if edata['rating'] == None: edata['rating'] = 0
-                if edata['votes'] == None: edata['votes'] = 0
-                duration = re.compile('^([0-9]+)h([0-9]*)[m]?|([0-9]+)m$', re.IGNORECASE).search(episodeData.get('duration', episodeData.get('timeRequired', 0)))
-                if duration: 
-                    if duration.group(1) != None: 
-                        if duration.group(2) != '': edata['duration'] = int(duration.group(2))
-                        edata['duration'] += int(duration.group(1)) * 60
-                    elif duration.group(3) != None: 
-                        edata['duration'] = int(duration.group(3))
-                data.append(edata)
-        else:
-            episodes = sorted(showDetails.get('episodes'), key=lambda item: item['episodenumber'], reverse=True if order == 'desc' else False)
-
-            # Calculating episode index according to page and items per page
-            episodeIndex = (page * 1 - 1) * itemsPerPage
-            for index in range(episodeIndex, episodeIndex+itemsPerPage, 1):
-                if index >= nbEpisodes:
-                    break
-
-                logger.logDebug('Episode index : %s' % index)
-                episodeData = episodes[index]
-                url = episodeData.get('url')
-                episodeId = int(episodeData.get('id'))
-                res = episodeDB.get(episodeId)
-                if len(res) == 1:
-                    e = res[0]
-                    # Update title value with episode number
-                    if episodeData:
-                        e['title'] = episodeData.get('title')
-                        e['episodenumber'] = episodeData.get('episodenumber')
-                        e['showObj'] = showDetails
-                        # the thumbnail stored by an older version may no longer exist
-                        if episodeData.get('img'): e['image'] = episodeData.get('img')
-                    data.append(e)
-                else:
-                    image = episodeData.get('img')
-                    title = episodeData.get('title')
-                    dateAired = episodeData.get('aired')
-                    showTitle = showDetails.get('name')
-                    fanart = showDetails.get('fanart')
-                    year = dateAired.split('-').pop(0)
-                    description = episodeData.get('description')
-                    shortDescription = description
-                    episodeNumber = episodeData.get('episodenumber')
-                    
-                    e = {
-                        'id' : episodeId,
-                        'title' : title,
-                        'parentid' : int(showId),
-                        'show' : showTitle,
-                        'image' : image,
-                        'fanart' : fanart,
-                        'episodenumber' : episodeNumber,
-                        'url' : url,
-                        'description' : description,
-                        'shortdescription' : shortDescription,
-                        'dateaired' : dateAired,
-                        'date' : dateAired,
-                        'year' : year,
-                        'parentalAdvisory' : '',
-                        'showObj' : showDetails,
-                        'ltype' : showDetails.get('ltype'),
-                        'type' : 'episode'
-                        }
-                    episodeDB.set(e)
-                    data.append(e)
+                episodeDB.set(e)
+                data.append(e)
 
     # return sorted(data, key=lambda episode: episode['title'], reverse=True)
     return (data, hasNextPage)
