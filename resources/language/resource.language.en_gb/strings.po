@@ -272,6 +272,10 @@ msgctxt "#30201"
 msgid "By Category"
 msgstr ""
 
+msgctxt "#30202"
+msgid "GMA Play Home"
+msgstr ""
+
 msgctxt "#30203"
 msgid "Tools"
 msgstr ""

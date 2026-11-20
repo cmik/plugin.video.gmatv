@@ -81,6 +81,9 @@ elif mode == config.PLAY:
 elif mode == config.CATEGORIES:
     from resources.lib.indexers import navigator
     navigator.navigator().showCategories()
+elif mode == config.HOMESECTIONS:
+    from resources.lib.indexers import navigator
+    navigator.navigator().showHomeSections()
 elif mode == config.SECTIONCONTENT:
     from resources.lib.indexers import navigator
     navigator.navigator().showWebsiteSectionContent(url, page)

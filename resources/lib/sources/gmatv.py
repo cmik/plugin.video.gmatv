@@ -383,34 +383,14 @@ def extractListCategories(html):
     # int(re.compile('/([0-9]+)/', re.IGNORECASE).search(url).group(1))
     return data
     
-def getWebsiteSectionsData(forceUpdate=False):
+def getWebsiteHomeSections():
+    """The shelves of the GMA Play home page (id and name): their shows are only loaded when a shelf is opened"""
     logger.logInfo('called function')
     data = []
-    key = 'homeSECTION-%s' % datetime.datetime.now().strftime('%Y%m%d%H')
-    if forceUpdate:
-        cache.shortCache.delete(key)
-    if cache.shortCache.get(key) == '':
-        sectionList = callJsonApi(config.services.get('sections'), useCache=False)
-        if 'shelves' in sectionList :
-            shelves = sectionList.get('shelves')
-            for shelf in shelves:
-                if 'shelf_id' in shelf:
-                    sectionData = callJsonApi(config.services.get('sectionDetails') % shelf.get('shelf_id'), useCache=False)
-                    data.append({
-                        'id' :  shelf.get('shelf_id'),
-                        'name' : shelf.get('label'),
-                        'shows' : sectionData.get('shows', {}),
-                        })
-            cache.shortCache.set(key, json.dumps(data))
-    else:
-        data = json.loads(cache.shortCache.get(key))
-    return data
-
-def getWebsiteHomeSections():   
-    data = []
-    sections = getWebsiteSectionsData(True)
-    for section in sections:
-        data.append({'id' : section.get('id'), 'name' : section.get('name')}) #, 'url' : '/', 'fanart' : ''})
+    sectionList = callJsonApi(config.services.get('sections'))
+    for shelf in sectionList.get('shelves', []) if isinstance(sectionList, dict) else []:
+        if shelf.get('shelf_id'):
+            data.append({'id' : shelf.get('shelf_id'), 'name' : shelf.get('label')})
     return data
     
 def getWebsiteSectionContent(sectionId, page=1, itemsPerPage=8):
@@ -418,18 +398,9 @@ def getWebsiteSectionContent(sectionId, page=1, itemsPerPage=8):
     page -= 1
     data = []
     
-    sections = getWebsiteSectionsData()
-    for section in sections:
-        if section.get('id') == sectionId: break
-    
-    index = itemsPerPage * page
-    i = 0
-    for show in section.get('shows', []):
-        i += 1
-        if i > index:
-            data.append(extractWebsiteSectionShowData(show))
-        if i >= (index + itemsPerPage):
-            break
+    # the shelf is read once by the URL cache for all its pages
+    shows = getShows(sectionId, useCache=True)
+    data = shows[itemsPerPage * page:itemsPerPage * (page + 1)]
    
     # episodeDB.get([d.get('id') for d in data])
     return sorted(data, key=lambda item: item['name'], reverse=False)
@@ -510,11 +481,11 @@ def generateImageURL(image, type='poster', res='high', section='entertainment'):
         path = path.replace('/entertainment/', '/%s/' % section, 1)
     return config.websiteCDNUrl + path
 
-def getShows(subCategoryId, page = 1):
+def getShows(subCategoryId, page = 1, useCache = False):
     logger.logInfo('called function with param (%s, %s)' % (subCategoryId, page))
     data = []
     
-    shelf = callJsonApi(config.services.get('sectionDetails') % subCategoryId, useCache=False)
+    shelf = callJsonApi(config.services.get('sectionDetails') % subCategoryId, useCache=useCache)
     for show in shelf.get('shows', []) if isinstance(shelf, dict) else []:
         try:
             data.append(extractWebsiteSectionShowData(show))
