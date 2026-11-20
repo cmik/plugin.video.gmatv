@@ -139,43 +139,60 @@ def updateCatalogCache(loadEpisodes=False):
         # update sections cache
         control.showNotification(control.lang(37014), control.lang(30005))
         sections = getWebsiteHomeSections()
-        nbCat = len(sections)
-        i = 0
     except Exception as e:
         logger.logError('Can\'t update the catalog : %s' % (str(e)))
         return False
-        
+
+    # the shelves of the sections of the By category menu (Shows, Movies...) are not all on the Home section
+    try:
+        known = set(str(s['id']) for s in sections)
+        for category in getSiteMenu():
+            for shelf in category['subcat']:
+                if str(shelf['id']) not in known:
+                    known.add(str(shelf['id']))
+                    sections.append({'id' : shelf['id'], 'name' : shelf['name']})
+    except Exception as me:
+        logger.logError('Can\'t list the shelves of the menu : %s' % (str(me)))
+
+    nbCat = len(sections)
+    i = 0
+    loaded = set()
     for cat in sections:
         nbShow = 0
-        try: 
-            shows = getWebsiteSectionContent(cat['id'])
+        try:
+            # the whole shelf, not only its first page
+            shows = getShows(cat['id'])
             nbShow = len(shows)
         except Exception as ce:
             logger.logError('Can\'t update category %s : %s' % (cat['id'], str(ce)))
+            i+=1
             continue
         k = 0
         for s in shows:
-            try: 
+            k+=1
+            # a show is often on several shelves: load it once
+            if s['id'] in loaded:
+                continue
+            loaded.add(s['id'])
+            try:
                 if loadEpisodes: episodes = getEpisodesPerPage(s['id'], -1, s['year'], 1)
                 else: show = getShow(s['id'], -1, s['year'])
-            except Exception as se: 
+            except Exception as se:
                 logger.logError('Can\'t update show %s : %s' % (s['id'], str(se)))
-                k+=1
                 continue
-            k+=1
-            
-            elaps = time.time()-start 
+
+            elaps = time.time()-start
             if elaps > 5:
                 start = time.time()
                 catpercent = 100 * i / nbCat
                 cat1percent = 100 * 1 / nbCat
                 showpercent = 100 * k / nbShow
-                percent = catpercent + (cat1percent * (showpercent / 100) / 100)
+                percent = round(catpercent + (cat1percent * showpercent / 100), 1)
                 logger.logNotice('Updating catalog... %s' % (str(percent)+'%'))
-                logger.logNotice(str(percent)+'%')
                 control.infoDialog('Updating catalog... %s' % (str(percent)+'%'), heading=control.lang(30005), icon=control.addonIcon(), time=10000)
         i+=1
-        
+
+    logger.logNotice('Catalog updated: %d shelves, %d shows' % (nbCat, len(loaded)))
     return True
     
 def getSiteMenu():
