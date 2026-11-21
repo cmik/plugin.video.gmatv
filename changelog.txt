@@ -1,3 +1,5 @@
+2.0.1
+    [fix] Ready-made catalog not installed on a first installation (profile folder not created yet)
 2.0.0
     [new] Menus read from GMA Play (gmanetwork.com moved its full episodes to GMA Play)
     [new] Movies and public affairs shows
