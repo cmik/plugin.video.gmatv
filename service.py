@@ -8,7 +8,7 @@
 
 import re,shutil,threading,ssl,time,xbmc,xbmcaddon
 import http.cookiejar as cookielib
-from six.moves import socketserver
+import socketserver
 from urllib import request as libRequest
 from urllib.parse import quote,urlencode,urlparse,parse_qsl
 from http.server import SimpleHTTPRequestHandler
