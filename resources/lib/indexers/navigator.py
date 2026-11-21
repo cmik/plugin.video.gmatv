@@ -19,7 +19,7 @@
 '''
 
 
-import os,sys,xbmc,time,re
+import os,sys,xbmc,xbmcplugin,time,re
 from urllib.parse import parse_qsl,quote_plus,urlencode
 from resources import config
 from resources.lib.libraries import control
@@ -125,7 +125,7 @@ class navigator:
                 self.addDirectoryItem(title, str(e.get('id')), config.PLAY, e.get('image'), isFolder = False, query='title=%s' % title, **self.formatVideoInfo(e))
         if len(content) == itemsPerPage:
             self.addDirectoryItem(control.lang(36008), section, config.SECTIONCONTENT, '', page + 1)
-        self.endDirectory()
+        self.endDirectory(content=self.showsContent(content), sorts=self.PAGED_SORTS)
 
     def displayShows(self, shows):
         sortedShowInfos = []
@@ -137,7 +137,7 @@ class navigator:
         for info in sortedShowInfos:
             self.addDirectoryItem(info[1], info[2], info[3], info[4], isFolder=True, query=info[5], **info[6])
                 
-        self.endDirectory()
+        self.endDirectory(content=self.showsContent(shows), sorts=self.SHOW_SORTS)
         
     def showEpisodes(self, showId, page=1, parentId=-1, year=''):
         itemsPerPage = int(control.setting('itemsPerPage'))
@@ -147,7 +147,7 @@ class navigator:
             self.addDirectoryItem(e.get('title'), str(e.get('id')), config.PLAY, e.get('image'), isFolder = False, query='title=%s' % e.get('title'), **self.formatVideoInfo(e))
         if len(episodes) == itemsPerPage or nextPage == True:
             self.addDirectoryItem(control.lang(36008), showId, config.SHOWEPISODES, '', page + 1)
-        self.endDirectory()
+        self.endDirectory(content='episodes', sorts=self.EPISODE_SORTS)
 
     def showSearchMenu(self, category):    
         if category == 'movieshow':
@@ -173,6 +173,8 @@ class navigator:
                 elif category == 'episode':
                     for e in result:
                         self.addDirectoryItem(e.get('title'), str(e.get('id')), config.PLAY, e.get('image'), isFolder = False, query='title=%s' % e.get('title'), **self.formatVideoInfo(e))
+                    self.endDirectory(content='episodes', sorts=('UNSORTED', 'DATE', 'LABEL'))
+                    return True
         self.endDirectory()
             
     def showMyAccount(self):
@@ -233,13 +235,13 @@ class navigator:
         control.refresh()
             
     def showTools(self):
-        self.addDirectoryItem(control.lang(36021), config.uri.get('base'), config.IMPORTALLDB, control.addonFolderIcon(control.lang(36021)))
-        self.addDirectoryItem(control.lang(36019), config.uri.get('base'), config.IMPORTSHOWDB, control.addonFolderIcon(control.lang(36019)))
-        self.addDirectoryItem(control.lang(36020), config.uri.get('base'), config.IMPORTEPISODEDB, control.addonFolderIcon(control.lang(36020)))
-        self.addDirectoryItem(control.lang(36009), config.uri.get('base'), config.RELOADCATALOG, control.addonFolderIcon(control.lang(36009)))
-        self.addDirectoryItem(control.lang(36018), config.uri.get('base'), config.RESETCATALOG, control.addonFolderIcon(control.lang(36018)))
-        self.addDirectoryItem(control.lang(36017), config.uri.get('base'), config.CHECKLIBRARYUPDATES, control.addonFolderIcon(control.lang(36017)))
-        self.addDirectoryItem(control.lang(36010), config.uri.get('base'), config.CLEANCOOKIES, control.addonFolderIcon(control.lang(36010)))
+        self.addDirectoryItem(control.lang(36021), config.uri.get('base'), config.IMPORTALLDB, control.addonFolderIcon(control.lang(36021)), isFolder=False)
+        self.addDirectoryItem(control.lang(36019), config.uri.get('base'), config.IMPORTSHOWDB, control.addonFolderIcon(control.lang(36019)), isFolder=False)
+        self.addDirectoryItem(control.lang(36020), config.uri.get('base'), config.IMPORTEPISODEDB, control.addonFolderIcon(control.lang(36020)), isFolder=False)
+        self.addDirectoryItem(control.lang(36009), config.uri.get('base'), config.RELOADCATALOG, control.addonFolderIcon(control.lang(36009)), isFolder=False)
+        self.addDirectoryItem(control.lang(36018), config.uri.get('base'), config.RESETCATALOG, control.addonFolderIcon(control.lang(36018)), isFolder=False)
+        self.addDirectoryItem(control.lang(36017), config.uri.get('base'), config.CHECKLIBRARYUPDATES, control.addonFolderIcon(control.lang(36017)), isFolder=False)
+        self.addDirectoryItem(control.lang(36010), config.uri.get('base'), config.CLEANCOOKIES, control.addonFolderIcon(control.lang(36010)), isFolder=False)
         self.addDirectoryItem(control.lang(36022), config.uri.get('base'), config.FIRSTINSTALL, control.addonFolderIcon(control.lang(36022)))
         self.endDirectory()
             
@@ -287,16 +289,16 @@ class navigator:
     def formatShowInfo(self, info, addToList=True, options = {}):
         contextMenu = {}
         # add to mylist / remove from mylist
-        add = { control.lang(30300) : 'XBMC.Container.Update(%s)' % self.generateActionUrl(str(info.get('id')), config.ADDTOLIST, info.get('name'), query='ltype=%s&type=%s' % (info.get('ltype'), info.get('type'))) } 
-        remove = { control.lang(30301) : 'XBMC.Container.Update(%s)' % self.generateActionUrl(str(info.get('id')), config.REMOVEFROMLIST, info.get('name'), query='ltype=%s&type=%s' % (info.get('ltype'), info.get('type'))) } 
+        add = { control.lang(30300) : 'RunPlugin(%s)' % self.generateActionUrl(str(info.get('id')), config.ADDTOLIST, info.get('name'), query='ltype=%s&type=%s' % (info.get('ltype'), info.get('type'))) } 
+        remove = { control.lang(30301) : 'RunPlugin(%s)' % self.generateActionUrl(str(info.get('id')), config.REMOVEFROMLIST, info.get('name'), query='ltype=%s&type=%s' % (info.get('ltype'), info.get('type'))) } 
         if addToList == True: 
             contextMenu.update(add)
         else:
             contextMenu.update(remove)
         # export to library
         if control.setting('exportToLibrary') == 'true':
-            addToLibrary = { control.lang(30302) : 'XBMC.Container.Update(%s)' % self.generateActionUrl(str(info.get('id')), config.ADDTOLIBRARY, info.get('name'), query='parentid=%s&year=%s&ltype=%s&type=%s' % (str(info.get('parentid')), info.get('year'), info.get('ltype'), info.get('type'))) }
-            removeFromLibrary = { control.lang(30304) : 'XBMC.Container.Update(%s)' % self.generateActionUrl(str(info.get('id')), config.REMOVEFROMLIBRARY, info.get('name'), query='parentid=%s&year=%s&ltype=%s&type=%s' % (str(info.get('parentid')), info.get('year'), info.get('ltype'), info.get('type'))) }
+            addToLibrary = { control.lang(30302) : 'RunPlugin(%s)' % self.generateActionUrl(str(info.get('id')), config.ADDTOLIBRARY, info.get('name'), query='parentid=%s&year=%s&ltype=%s&type=%s' % (str(info.get('parentid')), info.get('year'), info.get('ltype'), info.get('type'))) }
+            removeFromLibrary = { control.lang(30304) : 'RunPlugin(%s)' % self.generateActionUrl(str(info.get('id')), config.REMOVEFROMLIBRARY, info.get('name'), query='parentid=%s&year=%s&ltype=%s&type=%s' % (str(info.get('parentid')), info.get('year'), info.get('ltype'), info.get('type'))) }
             if info.get('inLibrary', False) == True:
                 contextMenu.update(removeFromLibrary)
             else:
@@ -319,7 +321,7 @@ class navigator:
                     'plot' : info.get('description'), 
                     'year' : info.get('year'),
                     'mediatype' : 'tvshow',
-                    'studio': 'ABS-CBN', 
+                    'studio': 'GMA Network', 
                     'duration': info.get('duration', 0), 
                     'rating': info.get('rating', 0), 
                     'votes': info.get('votes', 0), 
@@ -338,8 +340,8 @@ class navigator:
         contextMenu = {}
         if info.get('bandwidth') == None:
             # add to mylist / remove from mylist
-            add = { control.lang(30300) : 'XBMC.Container.Update(%s)' % self.generateActionUrl(str(info.get('id')), config.ADDTOLIST, info.get('title'), query='ltype=%s&type=%s' % (info.get('ltype'), info.get('ltype'))) } 
-            remove = { control.lang(30301) : 'XBMC.Container.Update(%s)' % self.generateActionUrl(str(info.get('id')), config.REMOVEFROMLIST, info.get('title'), query='ltype=%s&type=%s' % (info.get('ltype'), info.get('ltype'))) } 
+            add = { control.lang(30300) : 'RunPlugin(%s)' % self.generateActionUrl(str(info.get('id')), config.ADDTOLIST, info.get('title'), query='ltype=%s&type=%s' % (info.get('ltype'), info.get('ltype'))) } 
+            remove = { control.lang(30301) : 'RunPlugin(%s)' % self.generateActionUrl(str(info.get('id')), config.REMOVEFROMLIST, info.get('title'), query='ltype=%s&type=%s' % (info.get('ltype'), info.get('ltype'))) } 
             if addToList == True: 
                 contextMenu.update(add)
             else:
@@ -358,11 +360,14 @@ class navigator:
                     'episode' : info.get('episodenumber'), 
                     'tracknumber' : info.get('episodenumber'), 
                     'plot' : info.get('description'), 
-                    'aired' : info.get('dateaired'), 
-                    'premiered' : info.get('dateaired'), 
+                    # 'date' is yyyy-mm-dd for the stored and the new episodes ('dateaired' is 'Nov 20, 2026' for the stored ones)
+                    'aired' : info.get('date') or info.get('dateaired'), 
+                    'premiered' : info.get('date') or info.get('dateaired'), 
+                    # the date sort of Kodi reads dd.mm.yyyy
+                    'date' : '.'.join(reversed(str(info.get('date')).split('-'))) if info.get('date') else '', 
                     'year' : info.get('year'), 
                     'mediatype' : info.get('type'),
-                    'studio': 'ABS-CBN', 
+                    'studio': 'GMA Network', 
                     'duration': info.get('duration', 0), 
                     'rating': info.get('rating', 0), 
                     'votes': info.get('votes', 0)
@@ -433,7 +438,24 @@ class navigator:
             pass
         return logger.logDebug(url)
 
-    def endDirectory(self, cacheToDisc=True):
-        control.directory(int(sys.argv[1]), cacheToDisc=cacheToDisc)
+    # sort methods offered by the lists (the first one is the order the add-on gives)
+    SHOW_SORTS = ('LABEL_IGNORE_THE', 'VIDEO_YEAR')
+    PAGED_SORTS = ('UNSORTED', 'LABEL_IGNORE_THE')
+    EPISODE_SORTS = ('UNSORTED', 'EPISODE', 'DATE', 'LABEL')
+
+    def endDirectory(self, cacheToDisc=True, content=None, sorts=()):
+        """Ends the listing; content (tvshows, movies, episodes) lets the skin choose its views"""
+        handle = int(sys.argv[1])
+        if content:
+            control.content(handle, content)
+        for sort in sorts:
+            method = getattr(xbmcplugin, 'SORT_METHOD_' + sort, None)
+            if method is not None:
+                control.sortMethod(handle, method)
+        control.directory(handle, cacheToDisc=cacheToDisc)
+
+    @staticmethod
+    def showsContent(shows):
+        return 'movies' if shows and all(s.get('ltype') == 'movie' for s in shows) else 'tvshows'
 
 

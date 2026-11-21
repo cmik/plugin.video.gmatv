@@ -47,6 +47,8 @@ directory = xbmcplugin.endOfDirectory
 
 content = xbmcplugin.setContent
 
+sortMethod = xbmcplugin.addSortMethod
+
 property = xbmcplugin.setProperty
 
 addonInfo = addon.getAddonInfo
@@ -261,7 +263,7 @@ def run(mode, caller='addon'):
     return execute('RunPlugin(plugin://%s/?mode=%s&caller=%s)' % (addonInfo('id'), mode, caller))
 
 def exit():
-    return execute("XBMC.Container.Update(path,replace)")
+    return execute("Container.Update(path,replace)")
 
 def refresh():
     return execute("Container.Refresh")
