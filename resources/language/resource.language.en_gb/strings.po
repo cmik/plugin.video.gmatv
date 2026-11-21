@@ -320,6 +320,10 @@ msgctxt "#30213"
 msgid "My Shows Last Episodes"
 msgstr ""
 
+msgctxt "#30214"
+msgid "My View History"
+msgstr ""
+
 # context menu
 msgctxt "#30300"
 msgid "Add to my watchlist"
@@ -335,6 +339,18 @@ msgstr ""
 
 msgctxt "#30304"
 msgid "Remove from library"
+msgstr ""
+
+msgctxt "#30305"
+msgid "Go to the show"
+msgstr ""
+
+msgctxt "#30306"
+msgid "Remove from my view history"
+msgstr ""
+
+msgctxt "#30307"
+msgid "Clear my view history"
 msgstr ""
 
 # Other menu items
@@ -565,4 +581,12 @@ msgstr ""
 
 msgctxt "#37048"
 msgid "Found %s result(s)"
+msgstr ""
+
+msgctxt "#37049"
+msgid "Clear the whole view history?"
+msgstr ""
+
+msgctxt "#37050"
+msgid "Viewed on %s"
 msgstr ""

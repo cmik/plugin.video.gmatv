@@ -84,6 +84,15 @@ elif mode == config.CATEGORIES:
 elif mode == config.HOMESECTIONS:
     from resources.lib.indexers import navigator
     navigator.navigator().showHomeSections()
+elif mode == config.VIEWHISTORY:
+    from resources.lib.indexers import navigator
+    navigator.navigator().showViewHistory(page)
+elif mode == config.REMOVEFROMHISTORY:
+    from resources.lib.indexers import navigator
+    navigator.navigator().removeFromHistory(url)
+elif mode == config.CLEARHISTORY:
+    from resources.lib.indexers import navigator
+    navigator.navigator().clearHistory()
 elif mode == config.SECTIONCONTENT:
     from resources.lib.indexers import navigator
     navigator.navigator().showWebsiteSectionContent(url, page)

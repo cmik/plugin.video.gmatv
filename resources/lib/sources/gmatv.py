@@ -14,7 +14,7 @@ from urllib.parse import urlencode,quote,quote_plus
 from operator import itemgetter
 from resources import config
 from resources.lib.libraries import control,cache,tools,origins
-from resources.lib.models import episodes,shows,library,showcast
+from resources.lib.models import episodes,shows,library,showcast,userdata
 
 bs = control.soup
 logger = control.logger
@@ -723,6 +723,49 @@ def getEpisodesPerPage(showId, parentId, year, page=1, itemsPerPage=8, order='de
     # return sorted(data, key=lambda episode: episode['title'], reverse=True)
     return (data, hasNextPage)
     
+def getViewHistory(page=1, itemsPerPage=8):
+    """The episodes viewed, the last viewed first, with their stored data when the catalog still has them.
+    Returns (episodes, hasNextPage)."""
+    logger.logInfo('called function with param (%s, %s)' % (page, itemsPerPage))
+    userData = episodeDB.getUserData()
+    rows = userData.getHistory(itemsPerPage + 1, (page - 1) * itemsPerPage)
+    hasNextPage = len(rows) > itemsPerPage
+    rows = rows[:itemsPerPage]
+    stored = dict((e['id'], e) for e in episodeDB.get([int(r['episodeid']) for r in rows if str(r['episodeid']).isdigit()]))
+    data = []
+    for r in rows:
+        episodeId = int(r['episodeid']) if str(r['episodeid']).isdigit() else r['episodeid']
+        e = dict(stored.get(episodeId) or {
+            'id' : episodeId,
+            'title' : r['title'],
+            'parentid' : int(r['showid']) if str(r['showid']).isdigit() else -1,
+            'show' : r['show'],
+            'image' : r['thumbnail'],
+            'fanart' : r['thumbnail'],
+            'description' : '',
+            'ltype' : r['ltype'],
+            'type' : 'episode',
+            'views' : userData.getViews(userdata.EPISODE, episodeId),
+            })
+        e['viewed'] = r['viewed']
+        data.append(e)
+    return (data, hasNextPage)
+
+def removeFromHistory(episodeId):
+    logger.logInfo('called function with param (%s)' % episodeId)
+    return episodeDB.getUserData().removeFromHistory(episodeId)
+
+def clearHistory():
+    logger.logInfo('called function')
+    return episodeDB.getUserData().clearHistory()
+
+def hasViewHistory():
+    try:
+        return episodeDB.getUserData().countHistory() > 0
+    except Exception as e:
+        logger.logError('Can\'t read the view history : %s' % str(e))
+        return False
+
 def addToMyList(id, name, ltype, type):
     logger.logInfo('called function with param (%s, %s, %s, %s)' % (id, name, ltype, type))
     url = config.uri.get('addToList')
