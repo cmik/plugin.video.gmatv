@@ -251,145 +251,45 @@ def getSubCategories(categoryId):
     # only the page of this section, not the whole menu
     return getSectionShelves(categoryId)
     
-def getMyListCategories():
+def getMyListShows():
+    """The shows of My List, the last added first. A show missing from the catalog (e.g. after it was
+    replaced) is loaded from the website."""
     logger.logInfo('called function')
-    url = config.uri.get('myList')
-    html = callServiceApi(url, useCache=False)
-    cache.shortCache.delete('mylistShowLastEpisodes')
-    return extractListCategories(html)
-    
-def getMylistCategoryItems(id):
-    logger.logInfo('called function')
-    url = config.uri.get('myList')
-    html = callServiceApi(url, useCache=False)
-    return extractListCategoryItems(html, id)
+    ids = showDB.getUserData().getMyListIds()
+    stored = dict((show.get('id'), show) for show in showDB.get([int(i) for i in ids if str(i).isdigit()]))
+    data = []
+    for showId in ids:
+        show = stored.get(int(showId)) if str(showId).isdigit() else None
+        if not show:
+            try:
+                show = getShow(int(showId))
+            except Exception as e:
+                logger.logError('Can\'t load the show %s of My List: %s' % (showId, str(e)))
+        if show:
+            data.append(show)
+    return data
+
+def getMyListIds():
+    try:
+        return set(int(i) for i in showDB.getUserData().getMyListIds() if str(i).isdigit())
+    except Exception as e:
+        logger.logError('Can\'t read My List: %s' % str(e))
+        return set()
 
 def getMylistShowLastEpisodes():
+    """The last episode of each show of My List, the latest aired first"""
     logger.logInfo('called function')
     data = []
-    key = 'mylistShowLastEpisodes-%s' % datetime.datetime.now().strftime('%Y%m%d%H')
-    logger.logInfo(key)
-    if cache.shortCache.get(key) == '':
-        url = config.uri.get('myList')
-        html = bs(callServiceApi(url, useCache=False), 'html.parser')
-
-        content = html.find("section", attrs = { 'id' : 'mylist-shows' }).find("ul", attrs = { 'class' : 'og-grid tv-programs-grid' })
-        if content:
-            for item in content.find_all("li"):
-                url = item.a['href']
-                if '/show/' in url:
-                    show = extractMyListShowData(url, item)
-                    (episodes, n) = getEpisodesPerPage(show.get('id'), show.get('parentid'), show.get('year', ''), 1, 1)
-                    data.append(episodes.pop())
-
-            cache.shortCache.set(key, json.dumps(data))
-    else:
-        data = json.loads(cache.shortCache.get(key).replace('\\\'', '\''))
-
-    return sorted(data, key=lambda item: item['title'] if 'title' in item else item['name'], reverse=False)
-
-def extractListCategoryItems(html, id):   
-    logger.logInfo('called function')
-    data = []
-    
-    html = bs(html, 'html.parser')
-    content = html.find("section", attrs = { 'id' : id }).find("ul", attrs = { 'class' : 'og-grid tv-programs-grid' })
-    if content:
-        for item in content.find_all("li"):
-            url = item.a['href']
-            if '/show/' in url:
-                data.append(extractMyListShowData(url, item))
-            elif '/episode/' in url:
-                data.append(extracMyListEpisodeData(url, item))
-    
-    return sorted(data, key=lambda item: item['title'] if 'title' in item else item['name'], reverse=False)
-    
-def extractMyListShowData(url, html):
-    logger.logInfo('called function')
-    showId = re.compile('/([0-9]+)/', re.IGNORECASE).search(url).group(1)
-    res = showDB.get(int(showId))
-    if len(res) == 1:
-        return res[0]
-    else:
-        showName = html.find("div", attrs = { 'class' : 'show-cover-thumb-title-mobile sub-category' }).get_text()
-        image = html.img['src']
-        
-        return {
-            'type' : 'show',
-            'ltype' : 'show',
-            'id' : int(showId),
-            'parentid' : -1,
-            'parentname' : '',
-            'name' : showName,
-            'logo' : image,
-            'image' : image,
-            'fanart' : image,
-            'banner' : image,
-            'description' : '',
-            'shortdescription' : '',
-            'year' : '',
-            'fanart' : image
-            }
-
-def extracMyListEpisodeData(url, html):
-    logger.logInfo('called function')
-    episodeId = re.compile('/([0-9]+)/', re.IGNORECASE).search(url).group(1)
-    res = episodeDB.get(int(episodeId))
-    if len(res) == 1:
-        return res[0]
-    else:
-        showName = html.find("h2", attrs = { 'class' : 'show-cover-thumb-title-mobile sub-category' }).get_text()
-        image = html.img['src']
-        dateAired = html.find("h3", attrs = { 'class' : 'show-cover-thumb-title-mobile sub-category' }).get_text()
-        
-        year = ''
-        episodeNumber = 0
-        description = ''
-        episodeName = ''
-        
-        if dateAired and len(dateAired) > 0:
-            episodeName = dateAired[0].replace('AIRED:', '')
-            year = episodeName.split(', ')[1]
-            
+    for show in getMyListShows():
         try:
-            datePublished = datetime.datetime.strptime(episodeName, '%b %d, %Y')
-        except TypeError:
-            datePublished = datetime.datetime(*(time.strptime(episodeName, '%b %d, %Y')[0:6]))
-        
-        return {
-            'id' : int(episodeId), 
-            'parentid' : -1,
-            'parentname' : '',
-            'title' : '%s - %s' % (showName, episodeName), 
-            'show' : showName, 
-            'image' : image, 
-            'episodenumber' : episodeNumber,
-            'url' : url, 
-            'description' : '',
-            'shortdescription' : '',
-            'dateaired' : episodeName,
-            'date' : datePublished.strftime('%Y-%m-%d'),
-            'year' : year,
-            'fanart' : image,
-            'ltype' : 'episode',
-            'type' : 'episode'
-            }
-    
-def extractListCategories(html):
-    logger.logInfo('called function')
-    data = []
-    html = bs(html, 'html.parser')
+            (episodes, nextPage) = getEpisodesPerPage(show.get('id'), show.get('parentid', -1), show.get('year', ''), 1, 1)
+        except Exception as e:
+            logger.logError('Can\'t load the last episode of %s: %s' % (show.get('name'), str(e)))
+            continue
+        if episodes:
+            data.append(episodes[0])
+    return sorted(data, key=lambda item: item.get('date') or '', reverse=True)
 
-    for li in html.nav.find_all("li"):
-        name, count = li.a.get_text().split(' ', 1)
-        data.append({
-            'id' : li.a['href'].replace('#', ''),
-            'name' : '%s (%s)' % (name, count)
-            })
-    # listCat = common.parseDOM(html, "section", attrs = { 'class' : 'sub-category-page' }, ret = 'id')
-    # int(re.compile('/([0-9]+)/', re.IGNORECASE).search(url).group(1))
-    return data
-    
 def getWebsiteHomeSections():
     """The shelves of the GMA Play home page (id and name): their shows are only loaded when a shelf is opened"""
     logger.logInfo('called function')
@@ -767,18 +667,16 @@ def hasViewHistory():
 
 def addToMyList(id, name, ltype, type):
     logger.logInfo('called function with param (%s, %s, %s, %s)' % (id, name, ltype, type))
-    url = config.uri.get('addToList')
-    logger.logDebug(url)
-    res = {}
-    control.showNotification(control.lang(37026))
+    showDB.getUserData().addToMyList(id, name)
+    control.showNotification(control.lang(37054) % name, control.lang(30200))
+    control.refresh()  # started by RunPlugin: the list on screen shows the change
 
 def removeFromMyList(id, name, ltype, type):
     logger.logInfo('called function with param (%s, %s, %s, %s)' % (id, name, ltype, type))
-    url = config.uri.get('removeFromList')
-    logger.logDebug(url)
-    res = {}
-    control.showNotification(control.lang(37026))
-    
+    showDB.getUserData().removeFromMyList(id)
+    control.showNotification(control.lang(37055) % name, control.lang(30200))
+    control.refresh()
+
 def showExportedShowsToLibrary():
     data = []
     temp = {}

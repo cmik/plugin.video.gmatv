@@ -23,7 +23,7 @@ EPISODE = 'episode'
 
 
 class UserData(model.Model):
-    """Data that belongs to the user (views, rating, view history, META), kept apart from the catalog
+    """Data that belongs to the user (My List, views, rating, view history, META), kept apart from the catalog
     databases (shows, episodes) so that refreshing, resetting or replacing the catalog never loses it."""
 
     # max values per "IN (...)" (SQLite older than 3.32 accepts 999 variables)
@@ -62,7 +62,11 @@ class UserData(model.Model):
                 THUMBNAIL TEXT, \
                 LTYPE TEXT, \
                 VIEWED TEXT)",
-            "CREATE INDEX IF NOT EXISTS HISTORY_EPISODE ON HISTORY (EPISODEID)"
+            "CREATE INDEX IF NOT EXISTS HISTORY_EPISODE ON HISTORY (EPISODEID)",
+            "CREATE TABLE IF NOT EXISTS MYLIST (\
+                SHOWID TEXT PRIMARY KEY, \
+                TITLE TEXT, \
+                ADDED TEXT)"
         ):
             self._exec(dbcur, sql)
         self._dbcon.commit()
@@ -86,6 +90,30 @@ class UserData(model.Model):
         dbcur = self.getCursor()
         self._exec(dbcur, "DELETE FROM META WHERE KEY LIKE ? ESCAPE '\\'", (prefix.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') + '%',))
         self._dbcon.commit()
+
+    # --- My List: the shows the user follows (the ids of the catalog databases)
+
+    def addToMyList(self, showId, title=''):
+        dbcur = self.getCursor()
+        self._exec(dbcur, 'INSERT OR REPLACE INTO MYLIST (SHOWID, TITLE, ADDED) VALUES (?, ?, ?)',
+                   (str(showId), title or '', time.strftime('%Y-%m-%d %H:%M:%S')))
+        self._dbcon.commit()
+        return True
+
+    def removeFromMyList(self, showId):
+        dbcur = self.getCursor()
+        self._exec(dbcur, 'DELETE FROM MYLIST WHERE SHOWID = ?', (str(showId),))
+        self._dbcon.commit()
+        return dbcur.rowcount > 0
+
+    def getMyList(self):
+        """The (show id, title) pairs of My List, the last added first"""
+        dbcur = self.getCursor()
+        self._exec(dbcur, 'SELECT SHOWID, TITLE FROM MYLIST ORDER BY ADDED DESC, ROWID DESC')
+        return [(r[0], r[1]) for r in dbcur.fetchall()]
+
+    def getMyListIds(self):
+        return [r[0] for r in self.getMyList()]
 
     # --- views, rating, votes
 

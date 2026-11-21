@@ -47,8 +47,8 @@ class navigator:
     def showMainMenu(self):
         self.addDirectoryItem(control.lang(30204), '/', config.SEARCHMENU, control.addonFolderIcon(control.lang(30204)), isFolder=True, **self.formatMenu())
 
-        # if control.setting('displayMyList') == 'true':
-        #     self.addDirectoryItem(control.lang(30200), '/', config.MYLIST, control.addonFolderIcon(control.lang(30200)), isFolder=True, **self.formatMenu())
+        if control.setting('displayMyList') == 'true':
+            self.addDirectoryItem(control.lang(30200), '/', config.MYLIST, control.addonFolderIcon(control.lang(30200)), isFolder=True, **self.formatMenu())
 
         # the shelves of the GMA Play home page are in a sub menu: about 17 of them would fill this one
         if control.setting('displayWebsiteSections') == 'true':
@@ -67,30 +67,25 @@ class navigator:
             
         self.endDirectory()
             
-    def showMyList(self):   
+    def showMyList(self):
         self.addDirectoryItem(control.lang(30213), '/', config.MYLISTSHOWLASTEPISODES, control.addonFolderIcon(control.lang(30213)), isFolder=True, **self.formatMenu())
-        categories = gmatv.getMyListCategories()
-        for c in categories:
-            self.addDirectoryItem(c.get('name'), str(c.get('id')), config.LISTCATEGORY, control.addonFolderIcon(c.get('name')), **self.formatMenu())
+        self.addDirectoryItem(control.lang(30215), '/', config.LISTCATEGORY, control.addonFolderIcon(control.lang(30215)), isFolder=True, **self.formatMenu())
         self.endDirectory()
 
-    def showMyListShowLastEpisodes(self):   
-        episodes = gmatv.getMylistShowLastEpisodes()
-        for e in episodes:
-            title = '%s - %s' % (e.get('show'), e.get('dateaired'))
-            self.addDirectoryItem(title, str(e.get('id')), config.PLAY, e.get('image'), isFolder = False, query='title=%s' % title, **self.formatVideoInfo(e, addToList=False))
-        self.endDirectory()
+    def showMyListShowLastEpisodes(self):
+        """The last episode of each show of My List, the latest aired first"""
+        for e in gmatv.getMylistShowLastEpisodes():
+            title = '%s - %s' % (e.get('show'), e.get('title'))
+            self.addDirectoryItem(title, str(e.get('id')), config.PLAY, e.get('image'), isFolder = False, query='title=%s' % title, **self.formatVideoInfo(e, options={'showLink': True, 'myList': True}))
+        self.endDirectory(content='episodes', sorts=('UNSORTED', 'DATE', 'LABEL'))
 
-    def showMyListCategory(self, url):   
-        items = gmatv.getMylistCategoryItems(url)
-        for e in items:
-            if e['type'] == 'show':
-                image = e.get('logo') if control.setting('useShowLogo') == 'true' else e.get('image')
-                self.addDirectoryItem(e.get('name'), str(e.get('id')), config.SHOWEPISODES, image, isFolder=True, query='parentid='+str(e.get('parentid'))+'&year='+e.get('year'), **self.formatShowInfo(e, addToList=False))
-            elif e['type'] == 'episode':
-                title = '%s - %s' % (e.get('show'), e.get('dateaired')) # if e.get('type') == 'movie' else '%s - Ep.%s - %s' % (e.get('show'), e.get('episodenumber'), e.get('dateaired'))
-                self.addDirectoryItem(title, str(e.get('id')), config.PLAY, e.get('image'), isFolder = False, query='title=%s' % title, **self.formatVideoInfo(e, addToList=False))
-        self.endDirectory()
+    def showMyListCategory(self, url=None):
+        """The shows of My List, the last added first"""
+        shows = gmatv.getMyListShows()
+        for e in shows:
+            image = e.get('logo') if control.setting('useShowLogo') == 'true' else e.get('image')
+            self.addDirectoryItem(e.get('name'), str(e.get('id')), config.SHOWEPISODES, image, isFolder=True, query='parentid='+str(e.get('parentid'))+'&year='+str(e.get('year')), **self.formatShowInfo(e, addToList=False))
+        self.endDirectory(content=self.showsContent(shows), sorts=self.PAGED_SORTS)
             
     def showCategories(self):
         categories = gmatv.getCategories()
@@ -308,12 +303,21 @@ class navigator:
             }
         return data
         
+    def inMyList(self, showId):
+        """Whether a show is in My List (read once per listing)"""
+        if getattr(self, '_myList', None) is None:
+            self._myList = gmatv.getMyListIds()
+        try:
+            return int(showId) in self._myList
+        except (TypeError, ValueError):
+            return False
+
     def formatShowInfo(self, info, addToList=True, options = {}):
         contextMenu = {}
         # add to mylist / remove from mylist
         add = { control.lang(30300) : 'RunPlugin(%s)' % self.generateActionUrl(str(info.get('id')), config.ADDTOLIST, info.get('name'), query='ltype=%s&type=%s' % (info.get('ltype'), info.get('type'))) } 
         remove = { control.lang(30301) : 'RunPlugin(%s)' % self.generateActionUrl(str(info.get('id')), config.REMOVEFROMLIST, info.get('name'), query='ltype=%s&type=%s' % (info.get('ltype'), info.get('type'))) } 
-        if addToList == True: 
+        if addToList == True and not self.inMyList(info.get('id')):
             contextMenu.update(add)
         else:
             contextMenu.update(remove)
@@ -360,14 +364,9 @@ class navigator:
     def formatVideoInfo(self, info, addToList=True, options = {}):
 
         contextMenu = {}
-        if info.get('bandwidth') == None:
-            # add to mylist / remove from mylist
-            add = { control.lang(30300) : 'RunPlugin(%s)' % self.generateActionUrl(str(info.get('id')), config.ADDTOLIST, info.get('title'), query='ltype=%s&type=%s' % (info.get('ltype'), info.get('ltype'))) } 
-            remove = { control.lang(30301) : 'RunPlugin(%s)' % self.generateActionUrl(str(info.get('id')), config.REMOVEFROMLIST, info.get('title'), query='ltype=%s&type=%s' % (info.get('ltype'), info.get('ltype'))) } 
-            if addToList == True: 
-                contextMenu.update(add)
-            else:
-                contextMenu.update(remove)
+        # My List holds shows: the last episodes of My List can remove their show
+        if options.get('myList') and str(info.get('parentid', -1)) not in ('', '-1', 'None'):
+            contextMenu.update({ control.lang(30301) : 'RunPlugin(%s)' % self.generateActionUrl(str(info.get('parentid')), config.REMOVEFROMLIST, info.get('show') or '') })
         # outside the list of its show (history, search): open the show
         if options.get('showLink') and str(info.get('parentid', -1)) not in ('', '-1', 'None'):
             showUrl = self.generateActionUrl(str(info.get('parentid')), config.SHOWEPISODES, info.get('show') or '')

@@ -109,6 +109,16 @@ class UserDataTest(unittest.TestCase):
         self.ud.clearHistory()
         self.assertEqual([], self.ud.getHistory())
 
+    def test_my_list(self):
+        self.assertEqual([], self.ud.getMyList())
+        self.ud.addToMyList(1000002521, 'A movie')
+        self.ud.addToMyList(17, 'A show')
+        self.ud.addToMyList(17, 'A show')  # added twice: listed once
+        self.assertEqual(['17', '1000002521'], self.ud.getMyListIds())  # the last added first
+        self.assertTrue(self.ud.removeFromMyList(1000002521))
+        self.assertFalse(self.ud.removeFromMyList(1000002521))
+        self.assertEqual([('17', 'A show')], self.ud.getMyList())
+
     def test_history_limit(self):
         self.ud.historyLimit = 5
         for i in range(12):
