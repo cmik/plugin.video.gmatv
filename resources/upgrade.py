@@ -32,5 +32,10 @@ def upgradeDB():
     from resources.lib.libraries import origins
     logger.logNotice('Movie types fixed: %d' % origins.fixTypes(control.showsFile, control.episodesFile))
 
+    # image URLs without an image name (HTTP 404 in Kodi), stored before the empty names were handled
+    from resources.lib.libraries import dbfixes
+    for path, table in ((control.showsFile, 'SHOW'), (control.episodesFile, 'EPISODE'), (control.celebritiesFile, 'SHOW_CAST')):
+        logger.logNotice('Empty images fixed in %s: %d' % (table, dbfixes.fixEmptyImages(path, table)))
+
 def upgradeSettings():
     return True

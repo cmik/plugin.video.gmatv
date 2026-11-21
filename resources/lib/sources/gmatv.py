@@ -1075,6 +1075,11 @@ def parseDate(text, formats):
 
 def cleanTextFromHTML(text):
     import html
+    if not text:
+        return ''
+    # plain text needs no parsing (BeautifulSoup warns when a text looks like a URL or a file name)
+    if '<' not in text:
+        return html.unescape(text)
     return html.unescape(bs(text, 'html.parser').text)
 
 def unicodetoascii(text):
