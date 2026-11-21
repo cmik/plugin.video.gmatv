@@ -45,9 +45,8 @@ jobs:
     name: kodi-addon-checker
     runs-on: ubuntu-latest
     env:
-      # baseline of the problems kodi-addon-checker already reported when this check was added
-      # (executable bits on the images, fanart size, old language folder): lower it as they are fixed, down to 0
-      MAX_ERRORS: 78
+      # no problem allowed (the 78 of the 1.x baseline are fixed); the warnings are not counted
+      MAX_ERRORS: 0
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,9 +58,8 @@ jobs:
       - name: Run kodi-addon-checker (Kodi 21 Omega)
         run: |
           kodi-addon-checker --branch omega plugin.video.gmatv 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee checker.log
-          # the last line only summarizes the problems
-          errors=$(grep -c '^ERROR: ' checker.log || true)
-          errors=$((errors - 1))
+          # the summary line ("We found N problems") is an ERROR line only when there are problems
+          errors=$(grep '^ERROR: ' checker.log | grep -vc 'We found' || true)
           echo "problems found: $errors (allowed: $MAX_ERRORS)"
           if [ "$errors" -gt "$MAX_ERRORS" ]; then
             echo "::error::kodi-addon-checker found $errors problems, more than the $MAX_ERRORS allowed"
