@@ -1,3 +1,6 @@
+2.1.0
+    [new] My List: add a show from its context menu, then My Shows and the last episode of each of them (kept when the catalog is reset)
+    [change] The old Add to my watchlist entry of the episodes, which no longer worked, is removed
 2.0.1
     [fix] Ready-made catalog not installed on a first installation (profile folder not created yet)
 2.0.0
