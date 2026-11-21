@@ -20,47 +20,26 @@ def importUserData():
         logger.logError('Can\'t import the user data: %s' % str(e))
         return 0
 
-def importShowDB():
-    fileSource = logger.logInfo(control.browse(1, 'Select your shows DB file', 'files', '.db'))
-    if (fileSource != ''):
-        logger.logInfo(xbmcvfs.copy(fileSource, control.showsFile))
-        control.showNotification(control.lang(37040), control.lang(30010))
-
-def importEpisodeDB():
-    fileSource = logger.logInfo(control.browse(1, 'Select your episodes DB file', 'files', '.db'))
-    if (fileSource != ''):
-        logger.logInfo(xbmcvfs.copy(fileSource, control.episodesFile))
-        control.showNotification(control.lang(37040), control.lang(30010))
-
 def importDBFiles():
-    status = True
-    importUserData()
-    try:
-        dBImportURL = control.setting('databaseImportURL')
-        
-        # Shows DB file
-        fileSource = dBImportURL + 'shows.db' 
-        logger.logInfo('Copying %s to %s' % (fileSource, control.showsFile))
-        status = True if status is True and logger.logInfo(xbmcvfs.copy(fileSource, control.showsFile)) != 0 else False
-
-        # Episodes DB file
-        fileSource = dBImportURL + 'episodes.db' 
-        logger.logInfo('Copying %s to %s' % (fileSource, control.episodesFile))
-        status = True if status is True and logger.logInfo(xbmcvfs.copy(fileSource, control.episodesFile)) != 0 else False
-
-        # Celebrities DB file
-        fileSource = dBImportURL + 'celebrities.db' 
-        logger.logInfo('Copying %s to %s' % (fileSource, control.celebritiesFile))
-        status = True if status is True and logger.logInfo(xbmcvfs.copy(fileSource, control.celebritiesFile)) != 0 else False
-    except:
-        status = False
-        pass
-    if status is True:
-        control.setSetting('showUpdateCatalog', 'false')
-        control.showNotification(control.lang(37003), control.lang(30010))
-    else:
-        control.showNotification(control.lang(37027), control.lang(30004))
-    return status
+    """Install the catalog seed (ready-made shows, episodes and celebrities databases), then look for
+    what is new since it was built, in the background. Returns True when it was installed."""
+    from resources.lib.libraries import seed
+    control.showNotification(control.lang(37051), control.lang(30005))
+    importUserData()  # before the catalog databases are replaced
+    manifest = seed.installCatalogSeed(
+        control.setting('catalogSeedURL'),
+        {'shows.db': control.showsFile, 'episodes.db': control.episodesFile, 'celebrities.db': control.celebritiesFile},
+        lambda percent: control.showNotification('%d%%' % percent, control.lang(37051), time=1000) if percent % 25 == 0 else None
+    )
+    if manifest is None:
+        control.showNotification(control.lang(37053), control.lang(30004), time=8000)
+        return False
+    control.setSetting('showUpdateCatalog', 'false')
+    control.setSetting('catalogSeedVersion', manifest.get('catalogVersion', ''))
+    control.showNotification(control.lang(37052), control.lang(30010))
+    # the shows that are new since the seed was built
+    control.execute('RunPlugin(plugin://%s/?mode=%d&caller=seed)' % (control.addonInfo('id'), config.CATCHUPCATALOG))
+    return True
 
 def deleteDBFiles():
     status = True
@@ -82,14 +61,10 @@ def deleteDBFiles():
     return status
 
 def checkInstallDB(refresh=False):
+    """Install the catalog seed when asked (refresh) or when there is no catalog yet. The databases
+    in place are replaced only once the seed has been downloaded and checked."""
     control.showNotification(control.lang(30005))
-    isInstalled = isDBInstalled()
-    
-    if refresh == True and isInstalled == True:
-        deleteDBFiles()
-    
-    if refresh == True or isInstalled == False:
-        # control.run(config.IMPORTALLDB, 'install')
+    if refresh == True or isDBInstalled() == False:
         importDBFiles()
 
 def isDBInstalled():

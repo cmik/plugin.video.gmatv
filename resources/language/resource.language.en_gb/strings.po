@@ -248,7 +248,11 @@ msgid "Theme"
 msgstr ""
 
 msgctxt "#30156"
-msgid "Databases import URL"
+msgid "Catalog seed URL"
+msgstr ""
+
+msgctxt "#30159"
+msgid "Catalog seed version"
 msgstr ""
 
 msgctxt "#30157"
@@ -402,16 +406,8 @@ msgctxt "#36018"
 msgid "Reset Catalog Cache"
 msgstr ""
 
-msgctxt "#36019"
-msgid "Select shows database file to import"
-msgstr ""
-
-msgctxt "#36020"
-msgid "Select episodes database file to import"
-msgstr ""
-
 msgctxt "#36021"
-msgid "Import automatically all database files"
+msgid "Install the ready-made catalog"
 msgstr ""
 
 msgctxt "#36022"
@@ -547,10 +543,6 @@ msgctxt "#37039"
 msgid "Catalog cache is now empty"
 msgstr ""
 
-msgctxt "#37040"
-msgid "The file was loaded successfully"
-msgstr ""
-
 msgctxt "#37041"
 msgid "Corresponding folders and files have been detected."
 msgstr ""
@@ -589,4 +581,16 @@ msgstr ""
 
 msgctxt "#37050"
 msgid "Viewed on %s"
+msgstr ""
+
+msgctxt "#37051"
+msgid "Installing the ready-made catalog..."
+msgstr ""
+
+msgctxt "#37052"
+msgid "Ready-made catalog installed, looking for the newer shows"
+msgstr ""
+
+msgctxt "#37053"
+msgid "The ready-made catalog can't be installed now: use Tools > Update Catalog"
 msgstr ""
