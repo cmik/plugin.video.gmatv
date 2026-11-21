@@ -212,20 +212,12 @@ def getSiteMenu():
     data = []
     
     # categories = sections of GMA Play (Shows, Movies...), sub categories = their shelves
-    sectionList = callJsonApi(config.services.get('sectionList'))
+    sectionList = callJsonApi(config.services.get('sectionList'), ttl=config.cacheTTLs.get('menu'))
     for section in sectionList.get('data', []) if isinstance(sectionList, dict) else []:
         sectionId = section.get('section_id')
         if not sectionId:
             continue
-        sectionPage = callJsonApi(config.services.get('sectionPage') % sectionId)
-        subCategories = []
-        for shelf in sectionPage.get('shelves', []) if isinstance(sectionPage, dict) else []:
-            if shelf.get('shelf_id'):
-                subCategories.append({
-                    'id' : str(shelf.get('shelf_id')), 
-                    'name' : shelf.get('label', ''), 
-                    'url' : ''
-                    })
+        subCategories = getSectionShelves(sectionId)
         
         # a section without shelf (Library) has nothing to browse
         if len(subCategories) > 0:
@@ -237,6 +229,19 @@ def getSiteMenu():
                 })
     return data
     
+def getSectionShelves(sectionId):
+    """The shelves of a section of GMA Play (Shows, Movies...)"""
+    data = []
+    sectionPage = callJsonApi(config.services.get('sectionPage') % sectionId, ttl=config.cacheTTLs.get('menu'))
+    for shelf in sectionPage.get('shelves', []) if isinstance(sectionPage, dict) else []:
+        if shelf.get('shelf_id'):
+            data.append({
+                'id' : str(shelf.get('shelf_id')), 
+                'name' : shelf.get('label', ''), 
+                'url' : ''
+                })
+    return data
+
 def getCategories():
     logger.logInfo('called function')
     data = getSiteMenu()
@@ -244,13 +249,8 @@ def getCategories():
     
 def getSubCategories(categoryId):
     logger.logInfo('called function')
-    data = []
-    categoryData = getSiteMenu()
-    for c in categoryData:
-        if str(c['id']) == categoryId:
-           data = c['subcat']
-           break
-    return data
+    # only the page of this section, not the whole menu
+    return getSectionShelves(categoryId)
     
 def getMyListCategories():
     logger.logInfo('called function')
@@ -395,7 +395,7 @@ def getWebsiteHomeSections():
     """The shelves of the GMA Play home page (id and name): their shows are only loaded when a shelf is opened"""
     logger.logInfo('called function')
     data = []
-    sectionList = callJsonApi(config.services.get('sections'))
+    sectionList = callJsonApi(config.services.get('sections'), ttl=config.cacheTTLs.get('home'))
     for shelf in sectionList.get('shelves', []) if isinstance(sectionList, dict) else []:
         if shelf.get('shelf_id'):
             data.append({'id' : shelf.get('shelf_id'), 'name' : shelf.get('label')})
@@ -493,7 +493,7 @@ def getShows(subCategoryId, page = 1, useCache = False):
     logger.logInfo('called function with param (%s, %s)' % (subCategoryId, page))
     data = []
     
-    shelf = callJsonApi(config.services.get('sectionDetails') % subCategoryId, useCache=useCache)
+    shelf = callJsonApi(config.services.get('sectionDetails') % subCategoryId, useCache=useCache, ttl=config.cacheTTLs.get('shelf'))
     for show in shelf.get('shows', []) if isinstance(shelf, dict) else []:
         try:
             data.append(extractWebsiteSectionShowData(show))
@@ -874,7 +874,7 @@ def generateEpisodeNFO(info, path, filePath):
     nfoString += '<path>%s</path>' % path
     nfoString += '<filenameandpath>%s</filenameandpath>' % filePath
     nfoString += '<basepath>%s</basepath>' % filePath
-    nfoString += '<studio>ABS-CBN</studio>'
+    nfoString += '<studio>GMA Network</studio>'
     
     return u'<?xml version="1.0" encoding="UTF-8" standalone="yes"?> \
 <!-- created on %s - by GMA.tv addon --> \
@@ -959,7 +959,7 @@ def checkIfError(html):
                 message = t.get_text().split(' | ')[1]
     return { 'error' : error, 'message' : message }
 
-def callServiceApi(path, params={}, headers=[], base_url=config.websiteUrl, useCache=True, jsonData=False, returnMessage=True):
+def callServiceApi(path, params={}, headers=[], base_url=config.websiteUrl, useCache=True, jsonData=False, returnMessage=True, ttl=None):
     logger.logInfo('called function with param (%s)' % (path))
     global cookieJar
     
@@ -976,7 +976,7 @@ def callServiceApi(path, params={}, headers=[], base_url=config.websiteUrl, useC
     
     if useCache == True:
         tmp = cache.shortCache.getMulti(key, ['url', 'timestamp'])
-        if (tmp == '') or (tmp[0] == '') or (time.time()-float(tmp[1])>int(control.setting('cacheTTL'))*60):
+        if (tmp == '') or (tmp[0] == '') or (time.time()-float(tmp[1])>(ttl if ttl is not None else int(control.setting('cacheTTL')))*60):
             toCache = True
             logger.logInfo('No cache for (%s)' % key)
         else:
@@ -1037,7 +1037,9 @@ def callServiceApi(path, params={}, headers=[], base_url=config.websiteUrl, useC
             pass
         
         if toCache == True and res:
-            value = res.get('message') if re.compile('application/json', re.IGNORECASE).search('|'.join(res['headers'].keys())) or re.compile('binary/octet-stream', re.IGNORECASE).search('|'.join(res['headers'].values())) else repr(res.get('message'))
+            # kept as text: the repr() of the bytes stored before ("b'{...}'") could not be read back as JSON
+            message = res.get('message')
+            value = message.decode('utf-8', 'replace') if isinstance(message, bytes) else message
             cache.shortCache.setMulti(key, {'url': value, 'timestamp' : time.time()})
             logger.logDebug(res.get('message'))
             logger.logInfo('Stored in cache (%s) : %s' % (key, {'url': value, 'timestamp' : time.time()}))
@@ -1050,10 +1052,10 @@ def callServiceApi(path, params={}, headers=[], base_url=config.websiteUrl, useC
         
     return res
 
-def callJsonApi(path, params={}, headers=[('X-Requested-With', 'XMLHttpRequest')], base_url=config.webserviceUrl, useCache=True, jsonData=False):
+def callJsonApi(path, params={}, headers=[('X-Requested-With', 'XMLHttpRequest')], base_url=config.webserviceUrl, useCache=True, jsonData=False, ttl=None):
     logger.logInfo('called function')
     data = {}
-    res = callServiceApi(path, params, headers, base_url, useCache, jsonData)
+    res = callServiceApi(path, params, headers, base_url, useCache, jsonData, ttl=ttl)
     try:
         data = json.loads(res) if res != '' else []
     except:

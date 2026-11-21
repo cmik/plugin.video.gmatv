@@ -14,6 +14,12 @@ cookieFileName = 'gmatv.cookie'
 shortCache = {'name' : 'gmatv', 'ttl': 1}
 longCache = {'name' : 'gmatv_db', 'ttl': 24*7}
 urlCachePrefix = 'urlcache_'
+# minutes the URL cache keeps an answer, by kind (the setting cacheTTL is used for the others)
+cacheTTLs = {
+    'menu' : 360,   # sections of GMA Play and their shelves (By Category)
+    'home' : 60,    # shelves of the home page
+    'shelf' : 60,   # shows of a shelf
+    }
 
 # HOSTS / URI / SERVICES
 webserviceUrl = 'https://data.igma.tv'
