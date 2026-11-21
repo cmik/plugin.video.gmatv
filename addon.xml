@@ -2,11 +2,8 @@
 <addon id="plugin.video.gmatv" name="GMA.tv" version="2.0.0~dev4" provider-name="cmik">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
-        <import addon="script.module.six"/>
         <import addon="script.module.beautifulsoup4" version="4.9.3"/>
         <import addon="script.common.plugin.cache" version="2.6.1"/>
-        <import addon="script.module.inputstreamhelper" version="0.4.2" />
-		<import addon="script.module.requests" version="2.22.0"/>
         <import addon="script.module.unidecode" version="1.1.1"/>
         <import addon="plugin.video.youtube" version="6.8.18+matrix.1" />
     </requires>
@@ -22,7 +19,7 @@
         <platform>all</platform>
         <license>GPL-3.0-or-later</license>
         <forum></forum>
-        <source>https://github.com/cmik/cmik.xbmc</source>
+        <source>https://github.com/cmik/plugin.video.gmatv</source>
         <news>v1.0.2 (27/10/2024)
           [fix] Fixed search
           [change] Retrieve episodes from database if episodes list from site is not available

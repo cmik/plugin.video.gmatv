@@ -7,7 +7,6 @@
 
 import os,sys,re,ssl,json,datetime,time,hashlib
 import http.cookiejar as cookielib
-import inputstreamhelper
 from unidecode import unidecode
 from urllib import request as libRequest
 from urllib.parse import urlencode,quote,quote_plus
