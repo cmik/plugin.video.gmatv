@@ -21,12 +21,14 @@ def upgradeDB():
     # the counters stored in the catalog databases must leave them before anything replaces them
     tools.importUserData()
 
-    if control.setting('lastVersion') in (''):
-        # Check if installation is complete
-        logger.logNotice('Checking installation')
+    # first installation or update from 1.x (other catalog ids): install the ready-made catalog
+    from resources.lib.libraries import seed
+    reason = seed.seedReason(control.setting('lastVersion'))
+    if reason:
+        logger.logNotice('Installing the catalog seed (%s)' % reason)
         tools.checkInstallDB(True)
-
-    tools.checkInstallDB()
+    else:
+        tools.checkInstallDB()
 
     # the first catalog reloads stored as movies the titles of the movies catalog that have several episodes
     from resources.lib.libraries import origins

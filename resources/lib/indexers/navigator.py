@@ -260,8 +260,6 @@ class navigator:
             
     def showTools(self):
         self.addDirectoryItem(control.lang(36021), config.uri.get('base'), config.IMPORTALLDB, control.addonFolderIcon(control.lang(36021)), isFolder=False)
-        self.addDirectoryItem(control.lang(36019), config.uri.get('base'), config.IMPORTSHOWDB, control.addonFolderIcon(control.lang(36019)), isFolder=False)
-        self.addDirectoryItem(control.lang(36020), config.uri.get('base'), config.IMPORTEPISODEDB, control.addonFolderIcon(control.lang(36020)), isFolder=False)
         self.addDirectoryItem(control.lang(36009), config.uri.get('base'), config.RELOADCATALOG, control.addonFolderIcon(control.lang(36009)), isFolder=False)
         self.addDirectoryItem(control.lang(36018), config.uri.get('base'), config.RESETCATALOG, control.addonFolderIcon(control.lang(36018)), isFolder=False)
         self.addDirectoryItem(control.lang(36017), config.uri.get('base'), config.CHECKLIBRARYUPDATES, control.addonFolderIcon(control.lang(36017)), isFolder=False)

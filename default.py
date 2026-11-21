@@ -150,12 +150,12 @@ elif mode == config.CHECKLIBRARYUPDATES and tools.isDBInstalled() == True:
 elif mode == config.CLEANCOOKIES:
     from resources.lib.sources import gmatv
     gmatv.cleanCookies()
-elif mode == config.IMPORTSHOWDB:
-    tools.importShowDB()
-elif mode == config.IMPORTEPISODEDB:
-    tools.importEpisodeDB()
 elif mode == config.IMPORTALLDB:
     tools.importDBFiles()
+elif mode == config.CATCHUPCATALOG:
+    # after the catalog seed: the shows that are new since it was built, without asking anything
+    from resources.lib.sources import gmatv
+    gmatv.updateCatalogCache(False, True)
 elif mode == config.FIRSTINSTALL:
     from resources.lib.indexers import navigator
     navigator.navigator().firstInstall()

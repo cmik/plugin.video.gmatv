@@ -23,7 +23,8 @@
         <setting id="lastVersion" type="text" label="30106" default="" visible="false"/>
         <setting id="defaultBG" type="text" label="30131" default="https://repo.cmik.me/gma.tv/media/fanart.jpg" visible="false"/>
         <setting id="appearance" type="labelenum" label="30155" default="DEFAULT" values="-|DEFAULT" visible="false"/>
-        <setting id="databaseImportURL" type="text" label="30156" default="https://repo.cmik.me/gma.tv/databases/" visible="false"/>
+        <setting id="catalogSeedURL" type="text" label="30156" default="https://github.com/cmik/plugin.video.gmatv/releases/download/catalog-seed/" visible="false"/>
+        <setting id="catalogSeedVersion" type="text" label="30159" default="" visible="false"/>
     </category>
     <category label="30101">
         <setting type="lsep" label="30103"/>
