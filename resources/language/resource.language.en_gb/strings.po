@@ -347,7 +347,7 @@ msgid "Next >>"
 msgstr ""
 
 msgctxt "#36009"
-msgid "Reload Catalog Cache"
+msgid "Update Catalog (new shows)"
 msgstr ""
 
 msgctxt "#36010"

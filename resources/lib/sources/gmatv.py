@@ -111,20 +111,23 @@ def resetCatalogCache():
     episodeDB.drop()
     showDB.drop()
     control.showNotification(control.lang(37039), control.lang(30010))
-    reloadCatalogCache()
+    reloadCatalogCache(onlyNew=False)
 
-def reloadCatalogCache():
+def reloadCatalogCache(onlyNew=True):
     logger.logInfo('called function')
     updateEpisodes = False
     if control.confirm('%s\n%s' % (control.lang(37035), control.lang(37036)), title=control.lang(30402)) == True:
         updateEpisodes = True
-    if updateCatalogCache(updateEpisodes) is True:
+    if updateCatalogCache(updateEpisodes, onlyNew) is True:
         control.showNotification(control.lang(37003), control.lang(30010))
     else:
         control.showNotification(control.lang(37027), control.lang(30004))
     
-def updateCatalogCache(loadEpisodes=False):
-    logger.logInfo('called function')
+def updateCatalogCache(loadEpisodes=False, onlyNew=True):
+    """Loads the shows of every shelf into the catalog. With onlyNew, the shows already in the catalog are
+    left as they are: the reload only looks for the new shows (and those a previous reload failed to load),
+    which takes a few minutes instead of hours. Their episodes are read from the website when a show is opened."""
+    logger.logInfo('called function with param (%s, %s)' % (loadEpisodes, onlyNew))
     control.showNotification(control.lang(37015), control.lang(30005))
     cache.longCache.cacheClean(True) 
     cache.shortCache.cacheClean(True)
@@ -161,6 +164,8 @@ def updateCatalogCache(loadEpisodes=False):
     nbCat = len(sections)
     i = 0
     loaded = set()
+    stored = set(int(s['id']) for s in showDB.getAll()) if onlyNew else set()
+    nbNew = 0
     for cat in sections:
         nbShow = 0
         try:
@@ -178,6 +183,9 @@ def updateCatalogCache(loadEpisodes=False):
             if s['id'] in loaded:
                 continue
             loaded.add(s['id'])
+            if int(s['id']) in stored:
+                continue
+            nbNew += 1
             try:
                 if loadEpisodes: episodes = getEpisodesPerPage(s['id'], -1, s['year'], 1)
                 else: show = getShow(s['id'], -1, s['year'])
@@ -196,7 +204,7 @@ def updateCatalogCache(loadEpisodes=False):
                 control.infoDialog('Updating catalog... %s' % (str(percent)+'%'), heading=control.lang(30005), icon=control.addonIcon(), time=10000)
         i+=1
 
-    logger.logNotice('Catalog updated: %d shelves, %d shows' % (nbCat, len(loaded)))
+    logger.logNotice('Catalog updated: %d shelves, %d shows, %d loaded (%s)' % (nbCat, len(loaded), nbNew, 'new ones only' if onlyNew else 'all'))
     return True
     
 def getSiteMenu():
@@ -602,10 +610,17 @@ def getShowEpisodes(showId):
     if 'count' in nbEpisodePages:
         if nbEpisodePages.get('count') != 'all':
             nbPages = int(nbEpisodePages.get('count'))
+            seen = set()
             for page in range(1, nbPages+1, 1):
                 pageData = callJsonApi(episodesService % (apiId, page), useCache = False)
-                if hasEpisodes(pageData):
-                    episodesList += pageData.get('data')
+                # some trackers give a wrong count (77225 pages for a movie whose every page is its only video):
+                # the pages end at the first one that brings no new episode
+                fresh = [e for e in pageData.get('data') if e.get('id') not in seen] if hasEpisodes(pageData) else []
+                if not fresh:
+                    if page < nbPages: logger.logNotice('Show %s: %d pages announced, the episodes end at page %d' % (showId, nbPages, page - 1))
+                    break
+                seen.update(e.get('id') for e in fresh)
+                episodesList += fresh
         else:
             pageData = callJsonApi(episodesService % (apiId, 'all'), useCache = False)
             if hasEpisodes(pageData):
