@@ -168,7 +168,7 @@ msgid "Addon new installation"
 msgstr ""
 
 msgctxt "#30130"
-msgid "Display my GMA.tv List"
+msgid "Display My List"
 msgstr ""
 
 msgctxt "#30131"
@@ -328,13 +328,17 @@ msgctxt "#30214"
 msgid "My View History"
 msgstr ""
 
+msgctxt "#30215"
+msgid "My Shows"
+msgstr ""
+
 # context menu
 msgctxt "#30300"
-msgid "Add to my watchlist"
+msgid "Add to My List"
 msgstr ""
 
 msgctxt "#30301"
-msgid "Remove from my watchlist"
+msgid "Remove from My List"
 msgstr ""
 
 msgctxt "#30302"
@@ -593,4 +597,12 @@ msgstr ""
 
 msgctxt "#37053"
 msgid "The ready-made catalog can't be installed now: use Tools > Update Catalog"
+msgstr ""
+
+msgctxt "#37054"
+msgid "%s added to My List"
+msgstr ""
+
+msgctxt "#37055"
+msgid "%s removed from My List"
 msgstr ""
