@@ -10,6 +10,8 @@ try:
 except:
     from pysqlite2 import dbapi2 as database
 
+import re
+
 from resources.lib.libraries import control
 logger = control.logger
     
@@ -58,6 +60,48 @@ class Model():
        
     def getCursor(self):
         return self._dbcon.cursor()
+
+    # The values always go to SQLite as parameters (a title like "It's Showtime" broke the
+    # queries built by hand); only the column names, which come from the code, are written in the SQL.
+    @staticmethod
+    def _column(name):
+        name = str(name)
+        if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', name):
+            raise ValueError('invalid column name %r' % name)
+        return name
+
+    @staticmethod
+    def _marks(values):
+        """The placeholders of an IN (...) list"""
+        return ','.join('?' * len(values))
+
+    def _where(self, search):
+        """The WHERE clause and its parameters of a search {column: text contained}"""
+        where = []
+        params = []
+        for k, v in search.items():
+            where.append('%s LIKE ?' % self._column(k))
+            params.append('%%%s%%' % v)
+        return ' AND '.join(where), params
+
+    def _sortBy(self, sort):
+        if sort == False:
+            return ''
+        direction = str(sort[1]).upper() if len(sort) > 1 else 'ASC'
+        if direction not in ('ASC', 'DESC'):
+            raise ValueError('invalid sort direction %r' % direction)
+        return 'ORDER BY %s %s' % (self._column(sort[0]), direction)
+
+    def _update(self, dbcur, table, columns, itemId):
+        """Update the columns of [(column, value)] that have a value, the others keep theirs"""
+        sets = []
+        params = []
+        for column, value in columns:
+            if value:
+                sets.append('%s = ?' % self._column(column))
+                params.append(value)
+        if sets:
+            dbcur.execute(logger.logDebug('UPDATE %s SET %s WHERE ID = ?' % (self._column(table), ', '.join(sets))), params + [itemId])
     
     def search(self, search, sort=False, limit=False):
         items = []

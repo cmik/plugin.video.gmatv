@@ -32,8 +32,8 @@ class ShowCast(model.Model):
     
     def _search(self, search, sort, limit):
         dbcur = self.getCursor()
-        where = ["%s LIKE '%%%s%%'" % (str(k), str(v)) for k,v in search.items()]
-        sortBy = 'ORDER BY %s %s' % (sort[0], sort[1]) if sort != False else ''
+        where, params = self._where(search)
+        sortBy = self._sortBy(sort)
         first = 'LIMIT %d' % int(limit) if limit != False else ''
         dbcur.execute(logger.logDebug("SELECT ID, \
             SHOWID, \
@@ -44,7 +44,7 @@ class ShowCast(model.Model):
             ORDR, \
             URL \
             FROM SHOW_CAST \
-            WHERE %s %s %s" % (' AND '.join(where), sortBy, first)))
+            WHERE %s %s %s" % (where, sortBy, first)), params)
         return logger.logDebug(dbcur.fetchall())
 
     def _retrieveAll(self):
@@ -71,7 +71,7 @@ class ShowCast(model.Model):
             ORDR, \
             URL \
             FROM SHOW_CAST \
-            WHERE %s IN (%s)" % (key, ','.join(str(v) for v in mixed))))
+            WHERE %s IN (%s)" % (self._column(key), self._marks(mixed))), list(mixed))
         return logger.logDebug(dbcur.fetchall())
 
     def _save(self, mixed):
@@ -81,17 +81,15 @@ class ShowCast(model.Model):
             if 'id' in data or ('showid' in data and 'castid' in data):
                 dbcur = self.getCursor()
                 dbcur.execute('PRAGMA encoding="UTF-8";')
-                for k, e in data.items():
-                    query = "UPDATE SHOW_CAST SET "
-                    query += "SHOWID = %d, " % data.get('showid') if data.get('showid', False) else "SHOWID = SHOWID, "
-                    query += "ACTORID = %d, " % data.get('castid') if data.get('castid', False) else "ACTORID = ACTORID, "
-                    query += "NAME = '%s', " % data.get('name') if data.get('name', False) else "NAME = NAME, "
-                    query += "ROLE = '%s', " % data.get('role') if data.get('role', False) else "ROLE = ROLE, "
-                    query += "THUMBNAIL = '%s', " % data.get('thumbnail') if data.get('thumbnail', False) else "THUMBNAIL = THUMBNAIL, "
-                    query += "ORDR = %d, " % data.get('order') if data.get('order', False) else "ORDR = ORDR, "
-                    query += "URL = '%s', " % data.get('url') if data.get('url', False) else "URL = URL "
-                    query += "WHERE ID = '%s'" % data.get('id', self.idFormat % (data.get('showid'), data.get('castid')))
-                    dbcur.execute(logger.logDebug(query))
+                self._update(dbcur, 'SHOW_CAST', [
+                    ('SHOWID', data.get('showid')),
+                    ('ACTORID', data.get('castid')),
+                    ('NAME', data.get('name')),
+                    ('ROLE', data.get('role')),
+                    ('THUMBNAIL', data.get('thumbnail')),
+                    ('ORDR', data.get('order')),
+                    ('URL', data.get('url')),
+                    ], data.get('id', self.idFormat % (data.get('showid'), data.get('castid'))))
         self._dbcon.commit()
         return True
 
@@ -102,17 +100,17 @@ class ShowCast(model.Model):
             self.checkIfTableExists()
             dbcur = self.getCursor()
             dbcur.execute('PRAGMA encoding="UTF-8";')
-            dbcur.execute(logger.logDebug("DELETE FROM SHOW_CAST WHERE ID in ('%s')" % "','".join(ids)))
+            dbcur.execute(logger.logDebug("DELETE FROM SHOW_CAST WHERE ID in (%s)" % self._marks(ids)), ids)
             for data in mixed:
-                dbcur.execute(logger.logDebug("INSERT INTO SHOW_CAST VALUES ('%s', %d, %d, '%s', '%s', '%s', %d, '%s')" % (
+                dbcur.execute("INSERT INTO SHOW_CAST VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (
                     data.get('id', self.idFormat % (data.get('showid'), data.get('castid'))), 
                     data.get('showid'), 
                     data.get('castid'), 
-                    data.get('name').replace('\'', '\'\''), 
-                    data.get('role').replace('\'', '\'\''), 
-                    data.get('thumbnail').replace('&#39;', '\'\''), 
+                    data.get('name'), 
+                    data.get('role'), 
+                    data.get('thumbnail').replace('&#39;', '\''), 
                     data.get('order'), 
-                    data.get('url'))))
+                    data.get('url')))
             self._dbcon.commit()
             return True
         return False
@@ -123,7 +121,7 @@ class ShowCast(model.Model):
         if len(ids) > 0:
             dbcur = self.getCursor()
             try: 
-                dbcur.execute(logger.logDebug("DELETE FROM SHOW_CAST WHERE ID in ('%s')" % "','".join(ids)))
+                dbcur.execute(logger.logDebug("DELETE FROM SHOW_CAST WHERE ID in (%s)" % self._marks(ids)), ids)
                 self._dbcon.commit()
                 return True
             except: pass
