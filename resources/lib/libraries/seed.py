@@ -144,8 +144,12 @@ def installCatalogSeed(baseUrl, targets, progress=None):
     manifest = fetchManifest(baseUrl)
     if manifest is None:
         return None
-    directory = tempfile.mkdtemp(prefix='gmatv-seed-', dir=os.path.dirname(targets['shows.db']))
+    directory = None
     try:
+        # on a first installation Kodi has not created the profile folder of the add-on yet
+        folder = os.path.dirname(targets['shows.db'])
+        os.makedirs(folder, exist_ok=True)
+        directory = tempfile.mkdtemp(prefix='gmatv-seed-', dir=folder)
         zipPath = download(baseUrl, manifest, directory, progress)
         files = extract(zipPath, directory, manifest)
         install(files, targets)
@@ -155,4 +159,5 @@ def installCatalogSeed(baseUrl, targets, progress=None):
         logger.logError('Can\'t install the catalog seed: %s' % str(e))
         return None
     finally:
-        shutil.rmtree(directory, ignore_errors=True)
+        if directory:
+            shutil.rmtree(directory, ignore_errors=True)

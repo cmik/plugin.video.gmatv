@@ -84,6 +84,13 @@ class SeedTest(unittest.TestCase):
         # the temporary folder is removed
         self.assertEqual([], [n for n in os.listdir(self.target) if n.startswith('gmatv-seed-')])
 
+    def test_first_installation_creates_the_profile_folder(self):
+        # Kodi creates the profile folder of an add-on only when a setting is saved
+        folder = os.path.join(self.dir, 'new', 'plugin.video.gmatv')
+        targets = dict((name, os.path.join(folder, name)) for name in self.targets)
+        self.assertTrue(seed.installCatalogSeed(self.url, targets))
+        self.assertTrue(os.path.exists(targets['episodes.db']))
+
     def test_corrupted_download_leaves_the_databases(self):
         makeDb(self.targets['shows.db'], 'SHOW', 2)
         with open(os.path.join(self.published, 'manifest.json'), 'w') as f:

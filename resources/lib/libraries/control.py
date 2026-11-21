@@ -108,6 +108,11 @@ skinPath = transPath('special://skin/')
 addonPath = transPath(addonInfo('path'))
 
 dataPath = transPath(addonInfo('profile'))
+# Kodi creates the profile folder only when a setting is saved: the databases need it before that
+try:
+    os.makedirs(dataPath, exist_ok=True)
+except Exception:
+    pass
 
 homePath = transPath('special://home')
 
