@@ -17,6 +17,9 @@ The latest working version can be found here : https://cmik.me/gmatvlastzip
 The source code is published on Github.
 Find the source code here: https://cmik.me/gmatvSourceCode 
 
+**WIKI:**
+Menus, catalog, settings and playback troubleshooting: https://github.com/cmik/plugin.video.gmatv/wiki
+
 Do not hesitate to share your feedbacks (ideas for new features, bug issues, etc...) about this add-on so we can improve it together.
 
 ---

@@ -1,3 +1,15 @@
+2.0.0
+    [new] Menus read from GMA Play (gmanetwork.com moved its full episodes to GMA Play)
+    [new] Movies and public affairs shows
+    [new] GMA Play Home sub menu and By Category menu
+    [new] My View History menu, watched flags, Go to the show
+    [new] Ready-made catalog installed on a first installation or an update from 1.x
+    [change] Update Catalog loads only the new shows (about a minute instead of hours)
+    [change] Views and history kept apart from the catalog (not lost when it is reset)
+    [change] Faster menus: lists kept in cache, sort methods and content types
+    [change] Dependencies six, requests and inputstreamhelper no longer needed
+    [fix] Episode thumbnails, empty images and views not saved
+    [fix] Search with an apostrophe, Reload Catalog and the Tools actions
 1.0.2
     Fixed search
     Retrieve episodes from database if episodes list from site is not available
