@@ -55,6 +55,9 @@ class navigator:
             self.addDirectoryItem(control.lang(30202), '/', config.HOMESECTIONS, control.addonFolderIcon(control.lang(30202)), isFolder=True, **self.formatMenu())
 
         self.addDirectoryItem(control.lang(30201), '/', config.CATEGORIES, control.addonFolderIcon(control.lang(30201)), isFolder=True, **self.formatMenu())
+
+        if gmatv.hasViewHistory():
+            self.addDirectoryItem(control.lang(30214), '/', config.VIEWHISTORY, control.addonFolderIcon(control.lang(30214)), isFolder=True, **self.formatMenu())
             
         if control.setting('exportToLibrary') == 'true':
             self.addDirectoryItem(control.lang(36023), '/', config.EXPORTEDSHOWS, control.addonFolderIcon(control.lang(36023)), isFolder=True, **self.formatMenu())
@@ -149,6 +152,27 @@ class navigator:
             self.addDirectoryItem(control.lang(36008), showId, config.SHOWEPISODES, '', page + 1)
         self.endDirectory(content='episodes', sorts=self.EPISODE_SORTS)
 
+    def showViewHistory(self, page=1):
+        itemsPerPage = int(control.setting('itemsPerPage'))
+        (episodes, nextPage) = gmatv.getViewHistory(page, itemsPerPage)
+        for e in episodes:
+            info = self.formatVideoInfo(e, options={'showLink': True, 'history': True})
+            viewed = control.lang(37050) % e.get('viewed', '')
+            info['listInfos']['video']['plot'] = '%s\n%s' % (viewed, e.get('description') or '')
+            self.addDirectoryItem(e.get('title'), str(e.get('id')), config.PLAY, e.get('image'), isFolder = False, query='title=%s' % e.get('title'), **info)
+        if nextPage:
+            self.addDirectoryItem(control.lang(36008), '/', config.VIEWHISTORY, '', page + 1)
+        self.endDirectory(content='episodes', sorts=('UNSORTED', 'LABEL'))
+
+    def removeFromHistory(self, episodeId):
+        gmatv.removeFromHistory(episodeId)
+        control.refresh()
+
+    def clearHistory(self):
+        if control.confirm(control.lang(37049), title=control.lang(30214)) == True:
+            gmatv.clearHistory()
+            control.refresh()
+
     def showSearchMenu(self, category):    
         if category == 'movieshow':
             self.addDirectoryItem(control.lang(30208), '/', config.EXECUTESEARCH, control.addonFolderIcon(control.lang(30208)), isFolder=True, query='category=%s&type=%s' % (category, 'title'), **self.formatMenu())
@@ -172,7 +196,7 @@ class navigator:
                     return True
                 elif category == 'episode':
                     for e in result:
-                        self.addDirectoryItem(e.get('title'), str(e.get('id')), config.PLAY, e.get('image'), isFolder = False, query='title=%s' % e.get('title'), **self.formatVideoInfo(e))
+                        self.addDirectoryItem(e.get('title'), str(e.get('id')), config.PLAY, e.get('image'), isFolder = False, query='title=%s' % e.get('title'), **self.formatVideoInfo(e, options={'showLink': True}))
                     self.endDirectory(content='episodes', sorts=('UNSORTED', 'DATE', 'LABEL'))
                     return True
         self.endDirectory()
@@ -346,6 +370,15 @@ class navigator:
                 contextMenu.update(add)
             else:
                 contextMenu.update(remove)
+        # outside the list of its show (history, search): open the show
+        if options.get('showLink') and str(info.get('parentid', -1)) not in ('', '-1', 'None'):
+            showUrl = self.generateActionUrl(str(info.get('parentid')), config.SHOWEPISODES, info.get('show') or '')
+            contextMenu.update({ control.lang(30305) : 'Container.Update(%s)' % showUrl })
+        if options.get('history'):
+            contextMenu.update({
+                control.lang(30306) : 'RunPlugin(%s)' % self.generateActionUrl(str(info.get('id')), config.REMOVEFROMHISTORY, info.get('title')),
+                control.lang(30307) : 'RunPlugin(%s)' % self.generateActionUrl('/', config.CLEARHISTORY, control.lang(30307)),
+                })
 
         data = { 
             'listArts' : { 
@@ -375,6 +408,9 @@ class navigator:
                 },
             'contextMenu' : contextMenu
             }
+        # played episodes are flagged as watched (only then: Kodi keeps its own flag otherwise)
+        if info.get('views', 0):
+            data['listInfos']['video']['playcount'] = int(info.get('views'))
 
         if info.get('showObj', False):
             data['listArts'].update({
