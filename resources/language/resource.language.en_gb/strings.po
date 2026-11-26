@@ -235,6 +235,14 @@ msgctxt "#30159"
 msgid "Catalog seed version"
 msgstr ""
 
+msgctxt "#30160"
+msgid "Notify the new episodes of My List"
+msgstr ""
+
+msgctxt "#30161"
+msgid "Check My List every (hours)"
+msgstr ""
+
 msgctxt "#30157"
 msgid "Export path"
 msgstr ""
@@ -310,6 +318,10 @@ msgstr ""
 
 msgctxt "#30215"
 msgid "My Shows"
+msgstr ""
+
+msgctxt "#30216"
+msgid "NEW"
 msgstr ""
 
 # context menu
@@ -577,4 +589,12 @@ msgstr ""
 
 msgctxt "#37055"
 msgid "%s removed from My List"
+msgstr ""
+
+msgctxt "#37056"
+msgid "New episode of %s"
+msgstr ""
+
+msgctxt "#37057"
+msgid "%d shows have new episodes: %s"
 msgstr ""

@@ -76,6 +76,8 @@ class navigator:
         """The last episode of each show of My List, the latest aired first"""
         for e in gmatv.getMylistShowLastEpisodes():
             title = '%s - %s' % (e.get('show'), e.get('title'))
+            if e.get('newEpisode'):
+                title = '[COLOR gold]%s[/COLOR] %s' % (control.lang(30216), title)
             self.addDirectoryItem(title, str(e.get('id')), config.PLAY, e.get('image'), isFolder = False, query='title=%s' % title, **self.formatVideoInfo(e, options={'showLink': True, 'myList': True}))
         self.endDirectory(content='episodes', sorts=('UNSORTED', 'DATE', 'LABEL'))
 

@@ -6,6 +6,7 @@
 '''
 
 import os
+import re
 import time
 
 try:
@@ -20,6 +21,19 @@ logger = control.logger
 
 SHOW = 'show'
 EPISODE = 'episode'
+
+
+def isNewEpisode(episodeId, aired, last):
+    """Whether the last episode of a show (id, air date YYYY-MM-DD) is new compared to what My List knows
+    of it (`last`: seen episode id, its air date, notified episode id). Nothing is new the first time (no seen
+    episode yet), and an older episode that became the last one (the newest was removed) is not new."""
+    seen, seenAired = (last or (None, None, None))[:2]
+    if not seen or str(episodeId) == str(seen):
+        return False
+    isDate = lambda text: bool(re.match(r'\d{4}-\d{2}-\d{2}', str(text or '')))
+    if isDate(aired) and isDate(seenAired) and str(aired)[:10] < str(seenAired)[:10]:
+        return False
+    return True
 
 
 class UserData(model.Model):
@@ -69,6 +83,11 @@ class UserData(model.Model):
                 ADDED TEXT)"
         ):
             self._exec(dbcur, sql)
+        # 2.2: the last episode of each show, as listed by My Shows Last Episodes (SEEN) and as notified (NOTIFIED)
+        columns = [r[1].upper() for r in self._exec(dbcur, 'PRAGMA table_info(MYLIST)').fetchall()]
+        for column in ('SEENEPISODE', 'SEENAIRED', 'NOTIFIEDEPISODE'):
+            if column not in columns:
+                self._exec(dbcur, 'ALTER TABLE MYLIST ADD COLUMN %s TEXT' % column)
         self._dbcon.commit()
 
     # --- meta
@@ -114,6 +133,26 @@ class UserData(model.Model):
 
     def getMyListIds(self):
         return [r[0] for r in self.getMyList()]
+
+    def getMyListLastEpisodes(self):
+        """{show id: (seen episode id, its air date, notified episode id)} of the shows of My List"""
+        dbcur = self.getCursor()
+        self._exec(dbcur, 'SELECT SHOWID, SEENEPISODE, SEENAIRED, NOTIFIEDEPISODE FROM MYLIST')
+        return dict((r[0], (r[1], r[2], r[3])) for r in dbcur.fetchall())
+
+    def setMyListSeenEpisode(self, showId, episodeId, aired=''):
+        """The last episode of a show was listed (it is then not notified anymore)"""
+        dbcur = self.getCursor()
+        self._exec(dbcur, 'UPDATE MYLIST SET SEENEPISODE = ?, SEENAIRED = ?, NOTIFIEDEPISODE = ? WHERE SHOWID = ?',
+                   (str(episodeId), aired or '', str(episodeId), str(showId)))
+        self._dbcon.commit()
+        return dbcur.rowcount > 0
+
+    def setMyListNotifiedEpisode(self, showId, episodeId):
+        dbcur = self.getCursor()
+        self._exec(dbcur, 'UPDATE MYLIST SET NOTIFIEDEPISODE = ? WHERE SHOWID = ?', (str(episodeId), str(showId)))
+        self._dbcon.commit()
+        return dbcur.rowcount > 0
 
     # --- views, rating, votes
 

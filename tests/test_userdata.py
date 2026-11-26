@@ -119,6 +119,38 @@ class UserDataTest(unittest.TestCase):
         self.assertFalse(self.ud.removeFromMyList(1000002521))
         self.assertEqual([('17', 'A show')], self.ud.getMyList())
 
+    def test_my_list_last_episodes(self):
+        self.ud.addToMyList(17, 'A show')
+        self.assertEqual({'17': (None, None, None)}, self.ud.getMyListLastEpisodes())
+        self.assertTrue(self.ud.setMyListSeenEpisode(17, 500, '2026-11-20'))
+        self.assertEqual({'17': ('500', '2026-11-20', '500')}, self.ud.getMyListLastEpisodes())
+        self.assertTrue(self.ud.setMyListNotifiedEpisode(17, 501))
+        self.assertEqual({'17': ('500', '2026-11-20', '501')}, self.ud.getMyListLastEpisodes())
+        self.assertFalse(self.ud.setMyListSeenEpisode(99, 1))  # not in My List
+
+    def test_my_list_columns_added_to_a_2_1_database(self):
+        path = os.path.join(self.dir, 'userdata21.db')
+        con = sqlite3.connect(path)
+        con.execute('CREATE TABLE MYLIST (SHOWID TEXT PRIMARY KEY, TITLE TEXT, ADDED TEXT)')
+        con.execute("INSERT INTO MYLIST VALUES ('17', 'A show', '2026-11-21 10:00:00')")
+        con.commit()
+        con.close()
+        ud = userdata.UserData(path)
+        self.assertEqual([('17', 'A show')], ud.getMyList())
+        self.assertEqual({'17': (None, None, None)}, ud.getMyListLastEpisodes())
+        userdata.UserData(path)  # opened again: the columns are not added twice
+
+    def test_is_new_episode(self):
+        isNew = userdata.isNewEpisode
+        self.assertFalse(isNew(500, '2026-11-20', None))  # never checked
+        self.assertFalse(isNew(500, '2026-11-20', (None, None, None)))
+        self.assertFalse(isNew(500, '2026-11-20', ('500', '2026-11-20', '500')))  # the same
+        self.assertTrue(isNew(501, '2026-11-21', ('500', '2026-11-20', '500')))
+        self.assertTrue(isNew(501, '2026-11-20', ('500', '2026-11-20', '500')))  # same day
+        self.assertTrue(isNew(501, '', ('500', '2026-11-20', '500')))  # no date: the id decides
+        self.assertFalse(isNew(499, '2026-11-19', ('500', '2026-11-20', '500')))  # the newest was removed
+        self.assertTrue(isNew(501, 'May 22, 2022', ('500', '2026-11-20', '500')))  # not a date to compare
+
     def test_history_limit(self):
         self.ud.historyLimit = 5
         for i in range(12):

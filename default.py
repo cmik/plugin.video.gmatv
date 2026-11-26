@@ -144,6 +144,9 @@ elif mode == config.RELOADCATALOG:
 elif mode == config.RESETCATALOG:
     from resources.lib.sources import gmatv
     gmatv.resetCatalogCache()
+elif mode == config.CHECKMYLISTEPISODES and tools.isDBInstalled() == True:
+    from resources.lib.sources import gmatv
+    gmatv.checkMyListNewEpisodes()
 elif mode == config.CHECKLIBRARYUPDATES and tools.isDBInstalled() == True:
     from resources.lib.sources import gmatv
     gmatv.checkLibraryUpdates(True if caller!='addon' else False)
