@@ -22,7 +22,9 @@ jobs:
         with:
           python-version: '3.11' # the Python used by Kodi 21
       - name: Compile all the Python files
-        run: python -W error::SyntaxWarning -W error::DeprecationWarning -m compileall -q -f default.py service.py resources
+        run: python -W error::SyntaxWarning -W error::DeprecationWarning -m compileall -q -f default.py service.py resources .github/scripts
+      - name: Modules of Kodi's repository used by the tests (catalog refresh outside Kodi)
+        run: pip install beautifulsoup4 unidecode
       - name: Unit tests (models, user data)
         run: python -m unittest discover -s tests -v
       - name: Check version, changelog, md5 and tracked files
@@ -37,7 +39,9 @@ jobs:
         with:
           python-version: '3.14' # the Python of Kodi 22
       - name: Compile all the Python files
-        run: python -W error::SyntaxWarning -W error::DeprecationWarning -m compileall -q -f default.py service.py resources
+        run: python -W error::SyntaxWarning -W error::DeprecationWarning -m compileall -q -f default.py service.py resources .github/scripts
+      - name: Modules of Kodi's repository used by the tests (catalog refresh outside Kodi)
+        run: pip install beautifulsoup4 unidecode
       - name: Unit tests
         run: python -m unittest discover -s tests -v
 
