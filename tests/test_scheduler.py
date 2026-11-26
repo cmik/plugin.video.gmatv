@@ -19,6 +19,7 @@ if 'xbmc' not in sys.modules:
 if 'resources.config' not in sys.modules:
     config = types.ModuleType('resources.config')
     config.CHECKLIBRARYUPDATES = 26
+    config.CHECKMYLISTEPISODES = 18
     sys.modules['resources.config'] = config
     import resources
     resources.config = config
@@ -60,6 +61,13 @@ class SchedulerTest(unittest.TestCase):
         self.assertEqual(self.tasks({'libraryAutoUpdate': 'true'}), [])
         self.assertEqual(self.tasks({'exportToLibrary': 'true', 'libraryAutoUpdate': 'true', 'librayCheckSchedule': '30'}),
                          [('library checker', 26, 1800)])
+
+    def test_my_list_checker_when_my_list_and_notifications_are_on(self):
+        self.assertEqual(self.tasks({'displayMyList': 'true', 'myListNotify': 'true', 'myListCheckSchedule': '3'}),
+                         [('My List new episodes', 18, 10800)])
+        self.assertEqual(self.tasks({'displayMyList': 'false', 'myListNotify': 'true'}), [])
+        self.assertEqual(self.tasks({'displayMyList': 'true', 'myListNotify': 'false'}), [])
+        self.assertEqual(self.tasks({'displayMyList': 'true', 'myListNotify': 'true', 'myListCheckSchedule': ''})[0][2], 21600)
 
     def test_bad_or_too_short_schedule(self):
         on = {'exportToLibrary': 'true', 'libraryAutoUpdate': 'true'}

@@ -25,6 +25,12 @@ def scheduledTasks():
         except ValueError:
             minutes = 60
         tasks.append(('library checker', config.CHECKLIBRARYUPDATES, 60 * max(minutes, 5)))
+    if control.setting('displayMyList') == 'true' and control.setting('myListNotify') == 'true':
+        try:
+            hours = int(control.setting('myListCheckSchedule'))
+        except ValueError:
+            hours = 6
+        tasks.append(('My List new episodes', config.CHECKMYLISTEPISODES, 3600 * max(hours, 1)))
     return tasks
 
 

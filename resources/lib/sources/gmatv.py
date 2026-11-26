@@ -276,19 +276,58 @@ def getMyListIds():
         logger.logError('Can\'t read My List: %s' % str(e))
         return set()
 
+def getShowLastEpisode(show):
+    """The last episode of a show read from the website, None when it has none or can't be read"""
+    try:
+        (episodes, nextPage) = getEpisodesPerPage(show.get('id'), show.get('parentid', -1), show.get('year', ''), 1, 1)
+    except Exception as e:
+        logger.logError('Can\'t load the last episode of %s: %s' % (show.get('name'), str(e)))
+        return None
+    return episodes[0] if episodes else None
+
 def getMylistShowLastEpisodes():
-    """The last episode of each show of My List, the latest aired first"""
+    """The last episode of each show of My List, the latest aired first. An episode that came out since
+    this list was last shown is flagged `newEpisode`; once listed, it is not notified anymore."""
     logger.logInfo('called function')
+    userData = showDB.getUserData()
+    lastEpisodes = userData.getMyListLastEpisodes()
     data = []
     for show in getMyListShows():
-        try:
-            (episodes, nextPage) = getEpisodesPerPage(show.get('id'), show.get('parentid', -1), show.get('year', ''), 1, 1)
-        except Exception as e:
-            logger.logError('Can\'t load the last episode of %s: %s' % (show.get('name'), str(e)))
+        episode = getShowLastEpisode(show)
+        if not episode:
             continue
-        if episodes:
-            data.append(episodes[0])
+        aired = episode.get('date') or ''  # YYYY-MM-DD ('dateaired' is formatted for display)
+        episode['newEpisode'] = userdata.isNewEpisode(episode.get('id'), aired, lastEpisodes.get(str(show.get('id'))))
+        userData.setMyListSeenEpisode(show.get('id'), episode.get('id'), aired)
+        data.append(episode)
     return sorted(data, key=lambda item: item.get('date') or '', reverse=True)
+
+def checkMyListNewEpisodes(quiet=False):
+    """Run by the service: notifies the shows of My List that have a new episode (each episode once)"""
+    logger.logInfo('called function')
+    userData = showDB.getUserData()
+    lastEpisodes = userData.getMyListLastEpisodes()
+    if not lastEpisodes:
+        return []
+    names = []
+    for show in getMyListShows():
+        episode = getShowLastEpisode(show)
+        if not episode:
+            continue
+        showId = str(show.get('id'))
+        aired = episode.get('date') or ''  # YYYY-MM-DD ('dateaired' is formatted for display)
+        last = lastEpisodes.get(showId)
+        if not last or not last[0]:
+            # first check of this show: what it has now is known, not new
+            userData.setMyListSeenEpisode(showId, episode.get('id'), aired)
+        elif userdata.isNewEpisode(episode.get('id'), aired, last) and str(episode.get('id')) != str(last[2]):
+            names.append(show.get('name') or episode.get('show') or '')
+            userData.setMyListNotifiedEpisode(showId, episode.get('id'))
+    logger.logNotice('My List: %d shows checked, new episodes for %s' % (len(lastEpisodes), names or 'none'))
+    if names and not quiet:
+        message = control.lang(37056) % names[0] if len(names) == 1 else control.lang(37057) % (len(names), ', '.join(names))
+        control.showNotification(message, control.lang(30200), time=8000)
+    return names
 
 def getWebsiteHomeSections():
     """The shelves of the GMA Play home page (id and name): their shows are only loaded when a shelf is opened"""
