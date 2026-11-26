@@ -32,11 +32,6 @@
         <setting id="cacheActive" type="bool" label="30111" default="true" visible="true"/>
         <setting id="cacheTTL" type="number" label="30158" default="240" enable="eq(-1,true)" visible="true"/>
         <setting id="displayTools" type="bool" label="30112" default="false" visible="true"/>
-        <setting id="useProxy" type="bool" label="30133" default="false" visible="false"/>
-        <setting id="proxyHost" type="text" label="30134" default="127.0.0.1" enable="eq(-1,true)" visible="false"/>
-        <setting id="proxyPort" type="number" label="30135" default="6532" enable="eq(-2,true)" visible="false"/>
-        <setting id="proxyStreamingUrl" label="30143" type="text" default="http://%s:%s/?url=%s" enable="eq(-3,true)" visible="false"/>
-        <setting id="proxyCheckUrl" label="30144" type="text" default="http://%s:%s/healthcheck" enable="eq(-4,true)" visible="false"/>
         <setting type="lsep" label="30118"/>
         <setting id="debug" type="bool" label="30119" default="false" visible="true"/>
         <setting id="debugLevel" type="labelenum" label="30120" default="ERROR" values="ERROR|NOTICE|INFO|DEBUG" enable="eq(-1,true)" visible="true"/>

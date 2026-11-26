@@ -312,15 +312,6 @@ def getWebsiteSectionContent(sectionId, page=1, itemsPerPage=8):
     # episodeDB.get([d.get('id') for d in data])
     return sorted(data, key=lambda item: item['name'], reverse=False)
     
-def removeDuplicates(list):
-    newList = []
-    uniq = {}
-    for d in list:
-        key = '%s_%s'% (d.get('type'), str(d.get('id')))
-        if key not in uniq: newList.append(d)
-        uniq[key]=1
-    return newList
-    
 def extractWebsiteSectionShowData(show):
     logger.logInfo('called function')
     
@@ -863,42 +854,6 @@ def enterSearch(category, type):
         control.showNotification(control.lang(37048) % len(data), control.lang(30001))
     return data
     
-def getFromCookieByName(string, startWith=False):
-    logger.logInfo('called function')
-    global cookieJar
-    cookieObj = None
-    
-    for c in cookieJar:
-        if (startWith and c.name.startswith(string)) or (not startWith and c.name == string) :
-            cookieObj = c
-            break
-                
-    return cookieObj
-    
-def getCookieContent(filter=False, exceptFilter=False):
-    logger.logInfo('called function')
-    global cookieJar
-    cookie = []
-    for c in cookieJar:
-        if (filter and c.name not in filter) or (exceptFilter and c.name in exceptFilter):
-            continue
-        cookie.append('%s=%s' % (c.name, c.value))
-    return cookie
-
-def checkIfError(html):
-    error = False
-    message = ''
-    if html == '' or html == None:
-        error = True
-        message = control.lang(37029)
-    else:
-        t = bs(html, 'html.parser').title
-        if t:
-            if 'Error' in t:
-                error = True
-                message = t.get_text().split(' | ')[1]
-    return { 'error' : error, 'message' : message }
-
 def callServiceApi(path, params={}, headers=[], base_url=config.websiteUrl, useCache=True, jsonData=False, returnMessage=True, ttl=None):
     logger.logInfo('called function with param (%s)' % (path))
     global cookieJar

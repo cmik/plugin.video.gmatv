@@ -196,55 +196,6 @@ class navigator:
                     return True
         self.endDirectory()
             
-    def showMyAccount(self):
-        gmatv.checkAccountChange(False)
-        categories = [
-            { 'name' : control.lang(36004), 'url' : config.uri.get('profile'), 'mode' : config.MYINFO },
-            { 'name' : control.lang(36005), 'url' : config.uri.get('base'), 'mode' : config.MYSUBSCRIPTIONS },
-            { 'name' : control.lang(36006), 'url' : config.uri.get('base'), 'mode' : config.MYTRANSACTIONS }
-        ]
-        for c in categories:
-            self.addDirectoryItem(c.get('name'), c.get('url'), c.get('mode'), control.addonFolderIcon(c.get('name')))
-        self.addDirectoryItem(control.lang(36007), config.uri.get('base'), config.LOGOUT, control.addonFolderIcon('Logout'), isFolder = False)    
-        self.endDirectory()
-    
-    def showMyInfo(self):
-        loggedIn = gmatv.isLoggedIn()
-        message = control.lang(37002)
-        if loggedIn == True:
-            try:
-                user = gmatv.getUserInfo()
-                message = 'First name: %s\nLast name: %s\nEmail: %s\nState: %s\nCountry: %s\nMember since: %s\n\n' % (
-                    user.get('firstName', ''),
-                    user.get('lastName', ''), 
-                    user.get('email', ''), 
-                    user.get('state', ''),
-                    user.get('country', ''), 
-                    user.get('memberSince', '')
-                    )
-            except:
-                pass
-        control.showMessage(message, control.lang(36001))
-    
-    def showMySubscription(self):
-        sub = gmatv.getUserSubscription()
-        message = ''
-        if sub:
-            message += '%s' % (sub.get('details'))
-        else:
-            message = control.lang(37002)
-        control.showMessage(message, control.lang(36002))
-        
-    def showMyTransactions(self):
-        transactions = gmatv.getUserTransactions()
-        message = ''
-        if len(transactions) > 0:
-            for t in transactions:
-                message += t + "\n"
-        else:
-            message = control.lang(37002)
-        control.showMessage(message, control.lang(36003))
-
     def showExportedShows(self):
         exported = gmatv.showExportedShowsToLibrary()
         self.displayShows(exported)
