@@ -179,32 +179,12 @@ msgctxt "#30132"
 msgid "Streaming Proxy"
 msgstr ""
 
-msgctxt "#30133"
-msgid "Use streaming proxy"
-msgstr ""
-
-msgctxt "#30134"
-msgid "Host"
-msgstr ""
-
-msgctxt "#30135"
-msgid "Port"
-msgstr ""
-
 msgctxt "#30136"
 msgid "Enable parental control"
 msgstr ""
 
 msgctxt "#30137"
 msgid "Parental code"
-msgstr ""
-
-msgctxt "#30143"
-msgid "Proxy URL format"
-msgstr ""
-
-msgctxt "#30144"
-msgid "Proxy check URL"
 msgstr ""
 
 msgctxt "#30145"
@@ -423,10 +403,6 @@ msgid "My exported items"
 msgstr ""
 
 # notifications / messages
-msgctxt "#37002"
-msgid "No available information"
-msgstr ""
-
 msgctxt "#37003"
 msgid "Catalog cache loaded successfully"
 msgstr ""
@@ -501,10 +477,6 @@ msgstr ""
 
 msgctxt "#37028"
 msgid "The streaming proxy is not active. You will not be able to watch videos.[CR]Please reboot your Kodi system."
-msgstr ""
-
-msgctxt "#37029"
-msgid "The response is empty"
 msgstr ""
 
 msgctxt "#37030"
