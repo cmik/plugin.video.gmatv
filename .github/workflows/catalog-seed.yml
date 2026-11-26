@@ -1,0 +1,62 @@
+name: Catalog seed
+
+# Every week, loads the shows that are new on GMA Play into the published catalog seed (the
+# ready-made catalog of new installations, release `catalog-seed`) and publishes it again when
+# something changed (.github/scripts/refresh_catalog.py). A new seed never has fewer rows than
+# the published one. Run it by hand to refresh it at once, or with `publish` off to only try it.
+
+on:
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the new seed
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: catalog-seed
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - run: pip install beautifulsoup4 unidecode
+
+      - name: Load the new shows and build the seed
+        id: refresh
+        run: |
+          set +e
+          python .github/scripts/refresh_catalog.py "$RUNNER_TEMP/work" "$RUNNER_TEMP/seed"
+          code=$?
+          set -e
+          if [ $code -eq 0 ]; then echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif [ $code -eq 3 ]; then echo "changed=false" >> "$GITHUB_OUTPUT"; echo "Nothing new since the published seed"
+          else exit $code; fi
+
+      - name: Summary
+        if: always() && steps.refresh.outcome == 'success'
+        run: |
+          {
+            echo "### Catalog seed"
+            echo "Changed: ${{ steps.refresh.outputs.changed }}"
+            echo '```json'
+            cat "$RUNNER_TEMP/seed/manifest.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish the new seed
+        if: steps.refresh.outputs.changed == 'true' && (github.event_name == 'schedule' || inputs.publish)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload catalog-seed "$RUNNER_TEMP/seed/catalog-seed.zip" "$RUNNER_TEMP/seed/manifest.json" --clobber
